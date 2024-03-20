@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "../../.."
+		},
+		{
+			"name": "hassio-ecoflow-cloud",
+			"path": "../../../../../home/vscode/hassio-ecoflow-cloud"
+		}
+	],
+	"settings": {}
+}
