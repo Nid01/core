@@ -129,6 +129,7 @@ FLOWS = {
         "eafm",
         "easyenergy",
         "ecobee",
+        "ecoflow_iot_open",
         "ecoforest",
         "econet",
         "ecovacs",
