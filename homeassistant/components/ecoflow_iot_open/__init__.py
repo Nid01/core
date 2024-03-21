@@ -5,6 +5,9 @@ from __future__ import annotations  # noqa: I001
 import logging
 
 
+from homeassistant.components.blue_current import DATA
+
+
 from .errors import (
     EcoFlowIoTOpenError,
     InvalidCredentialsError,
@@ -28,7 +31,7 @@ PLATFORMS: list[Platform] = [Platform.SENSOR]
 Any = object()
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
     """Set up EcoFlow IoT Open from a config entry."""
 
     # TO DO 1. Create API instance
@@ -38,43 +41,33 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # using components/econet as guideline
 
-    accessKey = entry.data[CONF_ACCESS_KEY]
-    secretKey = entry.data[CONF_SECRET_KEY]
+    accessKey = config_entry.data[CONF_ACCESS_KEY]
+    secretKey = config_entry.data[CONF_SECRET_KEY]
+
+    ecoFlowIoTOpenAPIConnector = EcoFlowIoTOpenAPI(hass, accessKey, secretKey)
 
     try:
-        api = await EcoFlowIoTOpenAPI.login(accessKey, secretKey)
-    except InvalidCredentialsError:
+        await hass.async_add_executor_job(ecoFlowIoTOpenAPIConnector.setup)
+    except (InvalidCredentialsError, KeyError):
         _LOGGER.error("Invalid credentials provided")
         return False
     except EcoFlowIoTOpenError as err:
         _LOGGER.error("Config entry failed: %s", err)
         raise ConfigEntryNotReady from err
 
-    _LOGGER.debug(api.certificateAccount)
-    # try:
-    #     equipment = await api.get_devices_by_model(
-    #         [
-    #             EcoFlowModel.DELTA_MAX,
-    #             EcoFlowModel.DELTA_MAX,
-    #             EcoFlowModel.DELTA_MAX_SMART_EXTRA_BATTERY,
-    #             EcoFlowModel.POWERSTREAM,
-    #             EcoFlowModel.SMART_PLUG,
-    #             EcoFlowModel.SINGLE_AXIS_SOLAR_TRACKER,
-    #         ]
-    #     )
-    # except (ClientError, GenericHTTPError, InvalidResponseFormat) as err:
-    #     raise ConfigEntryNotReady from err
+    # Do first update
+    await hass.async_add_executor_job(ecoFlowIoTOpenAPIConnector.update_devices)
 
-    # hass.data.setdefault(DOMAIN, {})
-    # is the upper call doing the same as the if condition below?
-    if DOMAIN not in hass.data:
-        hass.data[DOMAIN] = {}
+    hass.data.setdefault(DOMAIN, {})
+    hass.data[DOMAIN][config_entry.entry_id] = {DATA: ecoFlowIoTOpenAPIConnector}
+
+    await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
+
+    ecoFlowIoTOpenAPIConnector.subscribe()
 
     # TO DO Setup MQTT client
 
     # hass.data[DOMAIN][entry.entry_id] = client
-
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     return True
 

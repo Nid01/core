@@ -1,15 +1,20 @@
 """API Interface for EcoFlow IoT Open Integration."""
 import hashlib
 import hmac
-import json
 import logging
 import random
+import ssl
 import time
 from typing import TypeVar
 
 from aiohttp import ClientSession
+import paho.mqtt.client as mqtt
 
-from .errors import EcoFlowIoTOpenError, GenericHTTPError, InvalidResponseFormat
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.dispatcher import dispatcher_send
+
+from .const import SIGNAL_ECOFLOW_IOT_OPEN_UPDATE_RECEIVED
+from .errors import GenericHTTPError, InvalidResponseFormat
 
 HOST = "api.ecoflow.com"
 REST_URL = "https://{HOST}/iot-open"
@@ -26,27 +31,22 @@ class EcoFlowIoTOpenAPI:
 
     def __init__(
         self,
+        hass: HomeAssistant,
         accessKey: str,
         secretKey: str,
-        # Arguments missing for parameters "certificateAccount", "certificatePassword"PylancereportCallIssue" for "cls(accessKey, secretKey)
-        # certificateAccount: str,
-        # certificatePassword: str,
     ) -> None:
-        """Create an EcoFlow IoT Open API interface object.
+        """Create an EcoFlow IoT Open API interface object."""
 
-        Args:
-            accessKey (str): accessKey for EcoFlow IoT Open API generated on https://developer-eu.ecoflow.com/us/security.
-            secretKey (str): secretKey for EcoFlow IoT Open API generated on https://developer-eu.ecoflow.com/us/security.
+        self.hass = hass
+        self._accessKey: str = accessKey
+        self._secretKey: str = secretKey
 
-        """
-
-        self.accessKey: str = accessKey
-        self.secretKey: str = secretKey
-        # self.mqtt_port = 8883
         self._certificateAccount: str  # = certificateAccount
         self._certificatePassword: str  # = certificatePassword
         self._devices: dict = {}
+        self.data: dict = {"device": {}}
         self._mqtt_client = None
+        self.mqtt_port = 8883
 
     @property
     def certificateAccount(self) -> str:
@@ -58,24 +58,65 @@ class EcoFlowIoTOpenAPI:
         """Return the current certificatePassword."""
         return self._certificatePassword
 
-    @classmethod
-    async def login(cls: type[ApiType], accessKey: str, secretKey: str) -> ApiType:
-        """Create an EcoFlowIoTOpenAPI object using accessKey and secretKey.
+    async def setup(self):
+        """Connect to EcoFlow IoT Open API and fetch devices and MQTT credentials."""
+        await self._get_devices()
 
-        Args:
-            accessKey (str): accessKey for EcoFlow IoT Open API generated on https://developer-eu.ecoflow.com/us/security.
-            secretKey (str): secretKey for EcoFlow IoT Open API generated on https://developer-eu.ecoflow.com/us/security.
+        await self._authenticate()
 
-        """
-        # Arguments missing for parameters "certificateAccount", "certificatePassword"PylancereportCallIssue" for "cls(accessKey, secretKey)
-        this_class = cls(accessKey, secretKey)
-        await this_class._authenticate(accessKey, secretKey)
-        return this_class
+    async def update_devices(self):
+        """Update the registered devices."""
 
-    async def _authenticate(self, accessKey: str, secretKey: str) -> None:
-        # """Authenticate against {REST_URL}/sign/certification in exchange for MQTT credentials."""
+        _session = ClientSession()
+        for _device in self._devices:
+            sn = _device["sn"]
+            _headers = create_headers(self._accessKey, self._secretKey, None)
+            async with _session.get(
+                f"{REST_URL}/sign/device/quota/all?={_device["sn"]}",
+                headers=_headers,
+                timeout=30,
+            ) as resp:
+                if resp.status == 200:
+                    _json = await resp.json()
+                    _LOGGER.debug(_json)
+                    if _json.get("message") == "success":
+                        _device["sn"] = _json
+                        self.data["device"][sn] = _device
+                        _LOGGER.debug(
+                            "Dispatching update to device %s: %s",
+                            sn,
+                            _device,
+                        )
+                        dispatcher_send(
+                            self.hass,
+                            SIGNAL_ECOFLOW_IOT_OPEN_UPDATE_RECEIVED.format(
+                                "device", sn
+                            ),
+                        )
 
-        _headers = create_headers(accessKey, secretKey, None)
+    async def _get_devices(self):
+        """Get a list of all the equipment for this user."""
+        _headers = create_headers(self._accessKey, self._secretKey, None)
+        _session = ClientSession()
+        async with _session.get(
+            f"{REST_URL}/sign/device/list", header=_headers, timeout=30
+        ) as resp:
+            if resp.status == 200:
+                _json = await resp.json()
+                _LOGGER.debug(_json)
+                if _json.get["message"] == "success":
+                    self._devices = _json.get("data")
+                    # return self._equipment
+                else:
+                    raise InvalidResponseFormat()
+            else:
+                raise GenericHTTPError(resp.status)
+        await _session.close()
+
+    async def _authenticate(self) -> None:
+        """Authenticate in exchange for MQTT credentials."""
+
+        _headers = create_headers(self._accessKey, self._secretKey, None)
         _session = ClientSession()
         async with _session.get(
             f"{REST_URL}/sign/certification", headers=_headers, timeout=30
@@ -83,7 +124,6 @@ class EcoFlowIoTOpenAPI:
             if resp.status == 200:
                 _json = await resp.json()
                 _LOGGER.debug(_json)
-                # @Nid01 - 20240320: does if _json.get("message")["success"]: work, too?
                 if _json.get["message"] == "success":
                     self._certificateAccount = _json.get("data").get(
                         "certificateAccount"
@@ -95,24 +135,40 @@ class EcoFlowIoTOpenAPI:
                     raise InvalidResponseFormat()
             else:
                 raise GenericHTTPError(resp.status)
-        await _session.close()
+            await _session.close()
         _LOGGER.info("Successfully retrieved MQTT credentials")
 
-    # async def get_devices_by_model(self, device_model: list) -> dict:
-    #     """Get a list of equipment by the equipment model"""
-    #     if not self._devices:
-    #         await self._get_devices()
+    def subscribe(self):
+        """Subscribe to the MQTT updates."""
 
-    #     deviceListUrl = self.IoTOpen_url + "/sign/device/list"
+        if not self.data.get("device"):
+            _LOGGER.error(
+                "Devices list is empty, did you call setup before subscribing?"
+            )
+            return False
 
-    #     payload = create_headers(deviceListUrl, self.accessKey, self.secretKey)
+        self._mqtt_client = mqtt.Client(
+            self._get_client_id(), clean_session=True, reconnect_on_failure=True
+        )
+        self._mqtt_client.username_pw_set(
+            self.certificateAccount, self.certificatePassword
+        )
+        self._mqtt_client.tls_set(
+            certfile=None, keyfile=None, cert_reqs=ssl.CERT_REQUIRED
+        )
+        self._mqtt_client.tls_insecure_set(False)
+        self._mqtt_client.on_connect = self._on_connect
 
-    #     try:
-    #         self.devices = payload["data"]
-    #     except KeyError as key:
-    #         raise EcoFlowIoTOpenError(
-    #             f"Failed to extract key {key} from {payload}"
-    #         ) from key
+    def _on_connect(self, client: mqtt.Client, userdata, flags, rc):
+        _LOGGER.debug("Connected with result code: %s", str(rc))
+        for device in self.data["device"]:
+            client.subscribe(
+                f"	/open/${self.certificateAccount}/${device["sn"]}/quota"
+            )
+
+    def _get_client_id(self) -> str:
+        time_string = str(time.time()).replace(".", "")[:13]
+        return f"{self._accessKey}_HomeAssistant_{time_string}"
 
 
 def hmac_sha256(data, key):
@@ -153,35 +209,27 @@ def create_headers(accessKey, secretKey, params=None) -> dict:
     headers = {"accessKey": accessKey, "nonce": nonce, "timestamp": timestamp}
     sign_str = (get_qstr(get_map(params)) + "&" if params else "") + get_qstr(headers)
     headers["sign"] = hmac_sha256(sign_str, secretKey)
-    # response = requests.get(url, headers=headers, json=params, timeout=30)
-
-    # if response.status_code != 200:
-    #     raise EcoFlowIoTOpenException(
-    #         "Got HTTP status code {response.status_code}: {response.text}"
-    #     )
-
-    # return get_json_response(response)
     return headers
 
 
-def get_json_response(response):
-    """Extract json payload from response."""
+# def get_json_response(response):
+#     """Extract json payload from response."""
 
-    payload = None
+#     payload = None
 
-    try:
-        payload = json.loads(response.text)
-        response_message = payload["message"]
-    except KeyError as key:
-        raise EcoFlowIoTOpenError(
-            f"Failed to extract key {key} from {payload}"
-        ) from key
-    except Exception as error:
-        raise EcoFlowIoTOpenError(
-            f"Failed to parse response: {response.text} Error: {error}"
-        ) from error
+#     try:
+#         payload = json.loads(response.text)
+#         response_message = payload["message"]
+#     except KeyError as key:
+#         raise EcoFlowIoTOpenError(
+#             f"Failed to extract key {key} from {payload}"
+#         ) from key
+#     except Exception as error:
+#         raise EcoFlowIoTOpenError(
+#             f"Failed to parse response: {response.text} Error: {error}"
+#         ) from error
 
-    if response_message.lower() != "success":
-        raise EcoFlowIoTOpenError(f"{response_message}")
+#     if response_message.lower() != "success":
+#         raise EcoFlowIoTOpenError(f"{response_message}")
 
-    return payload
+#     return payload
