@@ -5,40 +5,27 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from aiohttp import ClientError
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
-from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 
-from .const import DOMAIN
+from .api import EcoFlowIoTOpenAPI
+from .const import CONF_ACCESS_KEY, CONF_SECRET_KEY, DOMAIN
+from .errors import InvalidCredentialsError, MqttError
 
 _LOGGER = logging.getLogger(__name__)
 
-# TO DO adjust the data schema to the data that you need
+# TODO adjust the data schema to the data that you need # pylint: disable=fixme
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_HOST): str,
-        vol.Required(CONF_USERNAME): str,
-        vol.Required(CONF_PASSWORD): str,
+        # vol.Required(CONF_HOST): str,
+        vol.Required(CONF_ACCESS_KEY): str,
+        vol.Required(CONF_SECRET_KEY): str,
     }
 )
-
-
-class PlaceholderHub:
-    """Placeholder class to make tests pass.
-
-    TODO Remove this placeholder class and replace with things from your PyPI package.
-    """
-
-    def __init__(self, host: str) -> None:
-        """Initialize."""
-        self.host = host
-
-    async def authenticate(self, username: str, password: str) -> bool:
-        """Test if we can authenticate with the host."""
-        return True
 
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
@@ -46,26 +33,46 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
 
     Data has the keys from STEP_USER_DATA_SCHEMA with values provided by the user.
     """
-    # TO DO validate the data can be used to set up a connection.
+    # TODO validate the data can be used to set up a connection. # pylint: disable=fixme
 
     # If your PyPI package is not built with async, pass your methods
     # to the executor:
     # await hass.async_add_executor_job(
     #     your_validate_func, data[CONF_USERNAME], data[CONF_PASSWORD]
     # )
+    errors: dict[str, str] = {}
 
-    hub = PlaceholderHub(data[CONF_HOST])
+    ecoFlowIoTOpenAPIConnector = EcoFlowIoTOpenAPI(
+        hass, data[CONF_ACCESS_KEY], data[CONF_SECRET_KEY]
+    )
 
-    if not await hub.authenticate(data[CONF_USERNAME], data[CONF_PASSWORD]):
-        raise InvalidAuth
+    try:
+        await ecoFlowIoTOpenAPIConnector.setup()
+    except ClientError:
+        _LOGGER.debug("Cannot connect", exc_info=True)
+        errors["base"] = "cannot_connect"
+    except InvalidCredentialsError:
+        errors["base"] = "invalid_credentials"
+    except Exception:  # pylint: disable=broad-except
+        _LOGGER.exception("Unexpected exception during login", stack_info=True)
+        errors["base"] = "unknown"
 
-    # If you cannot connect:
-    # throw CannotConnect
-    # If the authentication is wrong:
-    # InvalidAuth
+    if errors:
+        return errors
+
+    try:
+        await ecoFlowIoTOpenAPIConnector.verify_mqtt_config()
+    except MqttError:
+        _LOGGER.debug("Cannot connect", exc_info=True)
+        errors["mqtt"] = "cannot_connect"
+    except InvalidCredentialsError:
+        errors["base"] = "invalid_auth"
+    except Exception:  # pylint: disable=broad-except
+        _LOGGER.exception("Unexpected exception during mqtt connection verification")
+        errors["base"] = "unknown"
 
     # Return info that you want to store in the config entry.
-    return {"title": "Name of the device"}
+    return {"title": "EcoFlow IoT Open"}
 
 
 class EcoFlowIoTOpenConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -77,6 +84,7 @@ class EcoFlowIoTOpenConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Handle the initial step."""
+
         errors: dict[str, str] = {}
         if user_input is not None:
             try:
