@@ -2,16 +2,20 @@
 
 
 class EcoFlowIoTOpenError(Exception):
-    """A base error."""
+    """EcoFlow IoT Open error."""
 
 
 class InvalidCredentialsError(EcoFlowIoTOpenError):
-    """An error related to invalid requests."""
+    """Invalid credentials error."""
 
 
 class InvalidResponseFormat(EcoFlowIoTOpenError):
-    """An error related to invalid requests."""
+    """Invalid response format error."""
 
 
 class GenericHTTPError(EcoFlowIoTOpenError):
-    """An error related to invalid requests."""
+    """Generic HTTP error."""
+
+
+class MqttError(EcoFlowIoTOpenError):
+    """MQTT error."""

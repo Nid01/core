@@ -8,6 +8,7 @@
   "homekit": {},
   "iot_class": "cloud_push",
   "requirements": [],
+  "single_config_entry": true,
   "ssdp": [],
   "zeroconf": []
 }
