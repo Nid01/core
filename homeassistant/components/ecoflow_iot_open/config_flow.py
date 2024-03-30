@@ -33,13 +33,6 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
 
     Data has the keys from STEP_USER_DATA_SCHEMA with values provided by the user.
     """
-    # TODO validate the data can be used to set up a connection. # pylint: disable=fixme
-
-    # If your PyPI package is not built with async, pass your methods
-    # to the executor:
-    # await hass.async_add_executor_job(
-    #     your_validate_func, data[CONF_USERNAME], data[CONF_PASSWORD]
-    # )
     errors: dict[str, str] = {}
 
     try:
@@ -66,6 +59,8 @@ class EcoFlowIoTOpenConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for EcoFlow IoT Open."""
 
     VERSION = 1
+
+    # TODO Extend config flow by adittional step for selecting specific devices after device list has been received from API.
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None

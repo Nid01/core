@@ -4,25 +4,41 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from homeassistant.components.sensor import (
+    SensorDeviceClass,
     SensorEntity,
     SensorEntityDescription,
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import PERCENTAGE
+from homeassistant.const import PERCENTAGE, UnitOfPower
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 
 from . import EcoFlowIotOpenEntity
-from .const import DEVICES, DOMAIN
-from .devices import Device, ProductType
+from .const import DOMAIN, PRODUCTS
+from .products import Device, ProductType
 
 SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
     SensorEntityDescription(
         key="battery_level",
         name="battery_level",
+        device_class=SensorDeviceClass.BATTERY,
         native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="inv_Output_Watts",
+        name="inv_Output_Watts",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="watts",
+        name="watts",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.WATT,
         state_class=SensorStateClass.MEASUREMENT,
     ),
 )
@@ -33,16 +49,18 @@ async def async_setup_entry(
 ) -> None:
     """Set up sensor based on a config entry."""
 
-    data = hass.data[DOMAIN][DEVICES][entry.entry_id]
-    devices = data[ProductType.DELTA_MAX].copy()
+    products: dict[ProductType, dict[str, Device]] = hass.data[DOMAIN][PRODUCTS][
+        entry.entry_id
+    ]
 
     sensors: list = []
-    sensors.extend(
-        EcoFlowIoTOpenSensor(_device, description)
-        for _device in devices
-        for description in SENSOR_TYPES
-        if getattr(_device, description.key, False) is not False
-    )
+    for devices in products.values():
+        for device in devices.values():
+            sensors.extend(
+                EcoFlowIoTOpenSensor(device, description)
+                for description in SENSOR_TYPES
+                if getattr(device, description.key, False) is not False
+            )
 
     if sensors:
         async_add_entities(sensors)
@@ -63,5 +81,5 @@ class EcoFlowIoTOpenSensor(EcoFlowIotOpenEntity, SensorEntity):
     @property
     def native_value(self) -> StateType | date | datetime | Decimal:
         """Return sensors state."""
-        value = getattr(self._EcoFlowIotOpen, self.entity_description.key)
+        value = getattr(self._device, self.entity_description.key)
         return value
