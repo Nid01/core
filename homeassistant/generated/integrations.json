@@ -1465,8 +1465,7 @@
       "name": "EcoFlow IoT Open",
       "integration_type": "hub",
       "config_flow": true,
-      "iot_class": "cloud_push",
-      "single_config_entry": true
+      "iot_class": "cloud_push"
     },
     "ecoforest": {
       "name": "Ecoforest",

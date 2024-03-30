@@ -12,9 +12,9 @@ from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 
-from .api import EcoFlowIoTOpenAPI
+from .api import EcoFlowIoTOpenAPIInterface
 from .const import CONF_ACCESS_KEY, CONF_SECRET_KEY, DOMAIN
-from .errors import InvalidCredentialsError, MqttError
+from .errors import InvalidCredentialsError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -42,12 +42,11 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     # )
     errors: dict[str, str] = {}
 
-    ecoFlowIoTOpenAPIConnector = EcoFlowIoTOpenAPI(
-        hass, data[CONF_ACCESS_KEY], data[CONF_SECRET_KEY]
-    )
-
     try:
-        await ecoFlowIoTOpenAPIConnector.setup()
+        await EcoFlowIoTOpenAPIInterface.certification(
+            data[CONF_ACCESS_KEY], data[CONF_SECRET_KEY]
+        )
+
     except ClientError:
         _LOGGER.debug("Cannot connect", exc_info=True)
         errors["base"] = "cannot_connect"
@@ -60,18 +59,6 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     if errors:
         return errors
 
-    try:
-        await ecoFlowIoTOpenAPIConnector.verify_mqtt_config()
-    except MqttError:
-        _LOGGER.debug("Cannot connect", exc_info=True)
-        errors["mqtt"] = "cannot_connect"
-    except InvalidCredentialsError:
-        errors["base"] = "invalid_auth"
-    except Exception:  # pylint: disable=broad-except
-        _LOGGER.exception("Unexpected exception during mqtt connection verification")
-        errors["base"] = "unknown"
-
-    # Return info that you want to store in the config entry.
     return {"title": "EcoFlow IoT Open"}
 
 
