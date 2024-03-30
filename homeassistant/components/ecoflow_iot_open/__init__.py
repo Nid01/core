@@ -15,8 +15,7 @@ from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import async_track_time_interval
 
 from .api import EcoFlowIoTOpenAPIInterface
-from .const import API_CLIENT, CONF_ACCESS_KEY, CONF_SECRET_KEY, DEVICES, DOMAIN
-from .devices import Device, ProductType
+from .const import API_CLIENT, CONF_ACCESS_KEY, CONF_SECRET_KEY, DOMAIN, PRODUCTS
 from .errors import (
     ClientError,
     EcoFlowIoTOpenError,
@@ -24,6 +23,7 @@ from .errors import (
     InvalidCredentialsError,
     InvalidResponseFormat,
 )
+from .products import Device, ProductType
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -48,13 +48,20 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         raise ConfigEntryNotReady from err
 
     try:
-        devices = await api.get_devices([ProductType.DELTA_MAX])
+        products = await api.get_devices_by_product(
+            [
+                ProductType.DELTA_MAX,
+                ProductType.POWERSTREAM,
+                ProductType.SINGLE_AXIS_SOLAR_TRACKER,
+                ProductType.SMART_PLUG,
+            ]
+        )
     except (ClientError, GenericHTTPError, InvalidResponseFormat) as err:
         raise ConfigEntryNotReady from err
 
-    hass.data.setdefault(DOMAIN, {API_CLIENT: {}, DEVICES: {}})
+    hass.data.setdefault(DOMAIN, {API_CLIENT: {}, PRODUCTS: {}})
     hass.data[DOMAIN][API_CLIENT][config_entry.entry_id] = api
-    hass.data[DOMAIN][DEVICES][config_entry.entry_id] = devices
+    hass.data[DOMAIN][PRODUCTS][config_entry.entry_id] = products
 
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
 
@@ -64,8 +71,9 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         """Handle a push update."""
         dispatcher_send(hass, PUSH_UPDATE)
 
-    for _device in devices[ProductType.DELTA_MAX]:
-        _device.set_update_callback(update_published)
+    for devices in products.values():
+        for device in devices.values():
+            device.set_update_callback(update_published)
 
     async def resubscribe(now):
         """Resubscribe to MQTT updates."""
@@ -91,8 +99,7 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
         ]
         api.disconnect()
         hass.data[DOMAIN][API_CLIENT].pop(config_entry.entry_id)
-        hass.data[DOMAIN][DEVICES].pop(config_entry.entry_id)
-        # hass.data[DOMAIN].pop(entry.entry_id)
+        hass.data[DOMAIN][PRODUCTS].pop(config_entry.entry_id)
 
     return unload_ok
 
@@ -102,13 +109,11 @@ class EcoFlowIotOpenEntity(Entity):
 
     _attr_should_poll = False
 
-    def __init__(self, EcoFlowIotOpen: Device) -> None:
+    def __init__(self, device: Device) -> None:
         """Initialize."""
-        self._EcoFlowIotOpen = EcoFlowIotOpen
-        self._attr_name = EcoFlowIotOpen.device_name
-        self._attr_unique_id = (
-            f"{EcoFlowIotOpen.serial_number}_{EcoFlowIotOpen.device_name}"
-        )
+        self._device = device
+        self._attr_name = device.device_name
+        self._attr_unique_id = f"{device.serial_number}_{device.device_name}"
         self._update_callback: Callable[[], None] | None = None
 
     async def async_added_to_hass(self) -> None:
@@ -132,10 +137,10 @@ class EcoFlowIotOpenEntity(Entity):
     def device_info(self) -> DeviceInfo:
         """Return device registry information for this entity."""
         return DeviceInfo(
-            identifiers={(DOMAIN, self._EcoFlowIotOpen.serial_number)},
+            identifiers={(DOMAIN, self._device.serial_number)},
             manufacturer="EcoFlow",
-            name=self._EcoFlowIotOpen.device_name,
-            model=self._EcoFlowIotOpen.model,
+            name=self._device.device_name,
+            model=self._device.model,
         )
 
     def set_update_callback(self, update_callback: Callable[[], None]) -> None:

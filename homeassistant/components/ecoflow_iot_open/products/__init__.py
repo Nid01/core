@@ -2,6 +2,7 @@
 
 from enum import Enum
 import logging
+from typing import Any
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,15 +45,21 @@ class Device:
         self._api = api_interface
         self._device_info = device_info
         self._update_callback = None
+        self._model: str
 
-    def set_update_callback(self, callback):
+    def set_update_callback(self, callback) -> None:
         """Set update callback for the device."""
         self._update_callback = callback
 
-    def update_device_info(self, update: dict):
+    def update_device_info(self, update: dict[str, Any]) -> None:
         """Take a dictionary and update the stored _device_info based on the present dict fields."""
         _set = False
-        for key, value in update["params"].items():
+        _json_key: str
+        if self.type in (ProductType.POWERSTREAM, ProductType.SMART_PLUG):
+            _json_key = "param"
+        else:
+            _json_key = "params"
+        for key, value in update[_json_key].items():
             try:
                 if isinstance(value, dict):
                     for _key, _value in value.items():
@@ -70,10 +77,17 @@ class Device:
             self._update_callback()
 
     @staticmethod
-    def _coerce_type_from_string(value: str) -> ProductType:
+    def _get_productType_for_sn_prefix(value: str) -> ProductType:
         """Return a proper type from a string input."""
-        if value[:4] == DELTA_MAX:
+        _serial_number = value[:4]
+        if _serial_number == DELTA_MAX:
             return ProductType.DELTA_MAX
+        if _serial_number == SINGLE_AXIS_SOLAR_TRACKER:
+            return ProductType.SINGLE_AXIS_SOLAR_TRACKER
+        if _serial_number == POWERSTREAM:
+            return ProductType.POWERSTREAM
+        if _serial_number == SMART_PLUG:
+            return ProductType.SMART_PLUG
         _LOGGER.error("Unknown device type state: %s", value)
         return ProductType.UNKNOWN
 
@@ -85,7 +99,7 @@ class Device:
     @property
     def type(self) -> ProductType:
         """Return the ProductType of the device."""
-        return self._coerce_type_from_string(self.serial_number)
+        return self._get_productType_for_sn_prefix(self.serial_number)
 
     @property
     def device_name(self) -> str:
@@ -99,5 +113,5 @@ class Device:
 
     @property
     def model(self) -> str:
-        """Return the value 0-100? of the battery level."""
-        return ""
+        """Return the model name."""
+        return self._model
