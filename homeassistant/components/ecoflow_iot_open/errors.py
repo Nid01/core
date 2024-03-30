@@ -19,3 +19,7 @@ class GenericHTTPError(EcoFlowIoTOpenError):
 
 class MqttError(EcoFlowIoTOpenError):
     """MQTT error."""
+
+
+class ClientError(EcoFlowIoTOpenError):
+    """Base class for client connection errors."""

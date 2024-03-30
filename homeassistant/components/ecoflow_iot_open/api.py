@@ -3,61 +3,48 @@
 import hashlib
 import hmac
 import json
+import logging
 import random
 import ssl
 import time
-from typing import Any, TypeVar
+from typing import TypeVar
 
 from aiohttp import ClientSession
 from aiomqtt import Client, MqttError as AioMqttError
-from deebot_client.logging_filter import get_logger
 from multidict import CIMultiDict
 from paho.mqtt import client as mqtt
 
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers import aiohttp_client
-from homeassistant.helpers.dispatcher import dispatcher_send
-
-from .const import DELTA_MAX, SIGNAL_ECOFLOW_IOT_OPEN_UPDATE_RECEIVED, EcoFlowDevice
+from .devices import DELTA_MAX
 from .devices.delta_max import DELTAMax
-from .errors import (
-    EcoFlowIoTOpenError,
-    GenericHTTPError,
-    InvalidResponseFormat,
-    MqttError,
-)
+from .errors import GenericHTTPError, InvalidResponseFormat, MqttError
 
 HOST = "api.ecoflow.com"
-REST_URL = f"https://{HOST}/iot-open"
+REST_BASE_URL = f"https://{HOST}/iot-open"
 MQTT_HOST = "mqtt-e.ecoflow.com"
 MQTT_PORT = 8883
-# HEADERS = {"accessKey": str, "nonce": str, "timestamp": str, "sign": str}
 
-_LOGGER = get_logger(__name__)
-_CLIENT_LOGGER = get_logger(f"{__name__}.client")
+_LOGGER = logging.getLogger(__name__)
+_CLIENT_LOGGER = logging.getLogger(f"{__name__}.client")
 
-ApiType = TypeVar("ApiType", bound="EcoFlowIoTOpenAPI")
+ApiType = TypeVar("ApiType", bound="EcoFlowIoTOpenAPIInterface")
 
 
-class EcoFlowIoTOpenAPI:
+class EcoFlowIoTOpenAPIInterface:
     """API interface object."""
 
     def __init__(
         self,
-        hass: HomeAssistant,
         accessKey: str,
         secretKey: str,
     ) -> None:
         """Create an EcoFlow IoT Open API interface object."""
 
-        self.hass = hass
         self._accessKey: str = accessKey
         self._secretKey: str = secretKey
 
-        self._certificateAccount: str  # = certificateAccount
-        self._certificatePassword: str  # = certificatePassword
-        self.devices: dict[str, EcoFlowDevice] = {}
-        # self.data: dict = {"device": {}}
+        self._certificateAccount: str
+        self._certificatePassword: str
+        self._devices: dict = {}
         self._mqtt_client: mqtt.Client
 
     @property
@@ -70,12 +57,15 @@ class EcoFlowIoTOpenAPI:
         """Return the current certificatePassword."""
         return self._certificatePassword
 
-    async def setup(self):
-        """Connect to EcoFlow IoT Open API and fetch devices and MQTT credentials."""
+    @classmethod
+    async def certification(
+        cls: type[ApiType], accessKey: str, secretKey: str
+    ) -> ApiType:
+        """Connect to EcoFlow IoT Open API and fetch MQTT credentials."""
 
-        await self._get_devices()
-
-        await self.authenticate()
+        this_class = cls(accessKey, secretKey)
+        await this_class._authenticate(accessKey, secretKey)
+        return this_class
 
     async def verify_mqtt_config(self) -> None:
         """Verify config by connecting to the broker."""
@@ -85,46 +75,6 @@ class EcoFlowIoTOpenAPI:
         except AioMqttError as ex:
             _LOGGER.warning("Cannot connect", exc_info=True)
             raise MqttError("Cannot connect") from ex
-
-    async def update_devices(self):
-        """Update the registered devices."""
-        for _device in self.devices.values():
-            # device: dict[str, Any] = device
-            # sn = _device["sn"]_device
-            _headers = create_headers(
-                self._accessKey, self._secretKey, {"sn": _device.serial_number}
-            )
-            async with (
-                aiohttp_client.async_get_clientsession(self.hass) as session,
-                session.get(
-                    f"{REST_URL}/sign/device/quota/all",
-                    headers=_headers,
-                    params={"sn": _device.serial_number},
-                    # , timeout=30
-                ) as response,
-            ):
-                if response.status == 200:
-                    _json = await response.json()
-                    # _LOGGER.debug(_json)
-                    if _json.get("message") == "Success":
-                        _device.update_device_info(
-                            _json.get("data")
-                        )  # = _json.get("data")
-                        # self.devices[_device.serial_number] = _device
-                        _LOGGER.debug(
-                            "Dispatching update to device %s: %s",
-                            _device.serial_number,
-                            _device,
-                        )
-                        dispatcher_send(
-                            self.hass,
-                            SIGNAL_ECOFLOW_IOT_OPEN_UPDATE_RECEIVED.format(
-                                "device", _device.serial_number
-                            ),
-                        )
-                    else:
-                        raise EcoFlowIoTOpenError(_json.get("message"))
-                break
 
     async def _get_client(self) -> Client:
         """Get MQTT client."""
@@ -137,68 +87,70 @@ class EcoFlowIoTOpenAPI:
             identifier=self._get_client_id(),
         )
 
-    # async def _get_devices(self):
-    #     """Get a list of all the equipment for this user."""
-    #     _headers = create_headers(self._accessKey, self._secretKey, None)
-    #     async with (
-    #         aiohttp_client.async_get_clientsession(self.hass) as session,
-    #         session.get(
-    #             f"{REST_URL}/sign/device/list",
-    #             headers=_headers,
-    #             # , timeout=30
-    #         ) as response,
-    #     ):
-    #         if response.status == 200:
-    #             _json = await response.json()
-    #             _LOGGER.debug(_json)
-    #             if _json.get("message") == "Success":
-    #                 self._devices = _json.get("data")
-    #                 # return self._equipment
-    #             else:
-    #                 raise InvalidResponseFormat()
-    #         else:
-    #             raise GenericHTTPError(response.status)
-
-    async def _get_devices(self):
-        """Get a list of all the equipment for this user."""
+    async def _get_devices(self) -> None:
+        """Get a list of all devices for this user."""
         _headers = create_headers(self._accessKey, self._secretKey, None)
-        # _session = ClientSession()
-        async with (
-            aiohttp_client.async_get_clientsession(self.hass) as session,
-            session.get(
-                f"{REST_URL}/sign/device/list", headers=_headers, timeout=30
-            ) as response,
-        ):
-            # response: requests.Response = requests.get(f"{REST_URL}/sign/device/list", headers=_headers)
-            # requests.get(f"{REST_URL}/sign/device/list", headers=_headers, timeout=30) #as resp:
-            if response.status == 200:
-                _json = await response.json()
-                _LOGGER.debug(_json)
-                if _json.get("message") == "Success":
-                    for device in _json.get("data", {}):
-                        _device: dict[str, Any] = device
-                        # _device_obj: Equipment = None
-                        if str(_device.get("sn")).startswith(DELTA_MAX):
-                            _device_obj = DELTAMax(_device)
-                            self.devices[_device_obj.serial_number] = _device_obj
-                        # self.devices =
-                        break
-                    # return self._equipment
+        _session = ClientSession()
+        try:
+            async with _session.get(
+                f"{REST_BASE_URL}/sign/device/list", headers=_headers
+            ) as response:
+                if response.status == 200:
+                    _json_device_list = await response.json()
+                    _LOGGER.debug(_json_device_list)
                 else:
-                    raise InvalidResponseFormat()
-            else:
-                raise GenericHTTPError(response.status)
+                    raise GenericHTTPError(response.status)
+        finally:
+            await _session.close()
 
-    # async def refresh_devices(self) -> None:
-    #     """Get a list of all the devices for this"""
+        if _json_device_list.get("message") == "Success":
+            for _device in _json_device_list.get("data", {}):
+                if str(_device.get("sn"))[:4] == DELTA_MAX:
+                    _device_obj = DELTAMax(_device, self)
+                    self._devices[_device_obj.serial_number] = _device_obj
 
-    async def authenticate(self) -> None:
+    async def refresh_devices(self) -> None:
+        """Refresh all devices for this user."""
+        for _device in self._devices.values():
+            _params = {"sn": _device.get("sn")}
+            _headers = create_headers(self._accessKey, self._secretKey, _params)
+            _session = ClientSession()
+            try:
+                async with _session.get(
+                    f"{REST_BASE_URL}/sign/device/quota/all",
+                    headers=_headers,
+                    params=_params,
+                ) as response:
+                    if response.status == 200:
+                        _json_quota_all = await response.json()
+                        _LOGGER.debug(_json_quota_all)
+                    else:
+                        raise GenericHTTPError(response.status)
+            finally:
+                await _session.close()
+
+            _device.update_device_info(_json_quota_all)
+
+    async def get_devices(self, product_type: list) -> dict:
+        """Get a list of all devices for this user."""
+        if not self._devices:
+            await self._get_devices()
+
+        _devices: dict = {}
+        for _product_type in product_type:
+            _devices[_product_type] = []
+        for value in self._devices.values():
+            if value.type in product_type:
+                _devices[value.type].append(value)
+        return _devices
+
+    async def _authenticate(self, accessKey: str, secretKey: str) -> None:
         """Authenticate in exchange for MQTT credentials."""
 
         _session = ClientSession()
-        _headers = create_headers(self._accessKey, self._secretKey, None)
+        _headers = create_headers(accessKey, secretKey, None)
         async with _session.get(
-            f"{REST_URL}/sign/certification", headers=_headers, timeout=30
+            f"{REST_BASE_URL}/sign/certification", headers=_headers, timeout=30
         ) as resp:
             if resp.status == 200:
                 _json = await resp.json()
@@ -211,7 +163,7 @@ class EcoFlowIoTOpenAPI:
                         "certificatePassword"
                     )
                 else:
-                    raise InvalidResponseFormat()
+                    raise InvalidResponseFormat(_json)
             else:
                 raise GenericHTTPError(resp.status)
             await _session.close()
@@ -220,7 +172,7 @@ class EcoFlowIoTOpenAPI:
     def subscribe(self):
         """Subscribe to the MQTT updates."""
 
-        if not self.devices:
+        if not self._devices:
             _LOGGER.error(
                 "Devices list is empty, did you call setup before subscribing?"
             )
@@ -229,7 +181,7 @@ class EcoFlowIoTOpenAPI:
         self._mqtt_client = mqtt.Client(
             client_id=self._get_client_id(),
             clean_session=True,
-            reconnect_on_failure=False,  # True,
+            reconnect_on_failure=True,
         )
         self._mqtt_client.username_pw_set(
             self.certificateAccount, self.certificatePassword
@@ -241,13 +193,16 @@ class EcoFlowIoTOpenAPI:
         self._mqtt_client.on_connect = self._on_connect
         self._mqtt_client.on_message = self._on_message
         self._mqtt_client.on_disconnect = self._on_disconnect
-        self._mqtt_client.connect_async(MQTT_HOST, MQTT_PORT, 30)
+        self._mqtt_client.connect_async(MQTT_HOST, MQTT_PORT)
         self._mqtt_client.loop_start()
 
     def unsubscribe(self) -> None:
         """Unsubscribe to the MQTT updates."""
-
         self._mqtt_client.loop_stop(force=True)
+
+    def disconnect(self) -> None:
+        """Disconnect from the MQTT broker."""
+        self._mqtt_client.disconnect()
 
     def _on_connect(
         self,
@@ -260,7 +215,7 @@ class EcoFlowIoTOpenAPI:
             case 0:
                 _LOGGER.debug("Connected with result code: %s", str(result_code))
                 topics_QoSs = []
-                for device in self.devices:
+                for device in self._devices:
                     topics_QoSs.append(
                         (f"/open/{self.certificateAccount}/{device}/status", 1)
                     )
@@ -285,34 +240,27 @@ class EcoFlowIoTOpenAPI:
                     "Failed to connect to MQTT: another error occurred: %s", result_code
                 )
 
+    def _on_message(self, client: mqtt.Client, userdata: None, msg: mqtt.MQTTMessage):
+        """When a MQTT message comes in push that update to the specified devices."""
+        unpacked_json = json.loads(msg.payload)
+        _LOGGER.debug("MQTT message from topic: %s", msg.topic)
+        _LOGGER.debug(json.dumps(unpacked_json, indent=2))
+        _serial_number: str = msg.topic.split("/")[3]
+        device = self._devices.get(_serial_number)
+        if device is not None:
+            device.update_device_info(unpacked_json)
+        else:
+            _LOGGER.error("Device with serial %s not found", _serial_number)
+
     def _on_disconnect(self, client: mqtt.Client, userdata: None, result_code: int):
         _LOGGER.debug("Disconnected with result code: %s", str(result_code))
         if result_code != 0:
-            # _LOGGER.error("EcoFlowIoTOpen MQTT unexpected disconnect. Attempting to reconnect")
-            # client.reconnect()
             _LOGGER.error(
                 "EcoFlowIoTOpen MQTT unexpected disconnect. Attempting no reconnect"
             )
 
-    def _on_message(self, client: mqtt.Client, userdata: None, msg: mqtt.MQTTMessage):
-        """When a MQTT message comes in push that update to the specified devices."""
-        # try:
-        unpacked_json = json.loads(msg.payload)
-        _LOGGER.debug("MQTT message from topic: %s", msg.topic)
-        _LOGGER.debug(json.dumps(unpacked_json, indent=2))
-        _serial: str = msg.topic.split("/")[3]
-        device = self.devices.get(_serial)
-        if device is not None:
-            device.update_device_info(unpacked_json)
-        else:
-            _LOGGER.error("Device with serial %s not found", _serial)
-        # except Exception as e:
-        #     _LOGGER.exception(e)
-        #     _LOGGER.error("Failed to parse the following MQTT message: %s", msg.payload)
-
     def _get_client_id(self) -> str:
-        # time_string = str(time.time()).replace(".", "")[:13]
-        return f"{self._accessKey}_HomeAssistant"  # _{time_string}"
+        return f"{self._accessKey}_HomeAssistant"
 
 
 def hmac_sha256(data, key):
@@ -360,32 +308,8 @@ def create_headers(accessKey: str, secretKey: str, params=None) -> dict:
         "nonce": nonce,
         "timestamp": timestamp,
     }
-    # headers = _session._prepare_headers(headers)
     sign_str = (get_map_qstr(get_map(params)) + "&" if params else "") + get_map_qstr(
         headers
     )
     headers["sign"] = hmac_sha256(sign_str, secretKey)
     return headers
-
-
-# def get_json_response(response):
-#     """Extract json payload from response."""
-
-#     payload = None
-
-#     try:
-#         payload = json.loads(response.text)
-#         response_message = payload["message"]
-#     except KeyError as key:
-#         raise EcoFlowIoTOpenError(
-#             f"Failed to extract key {key} from {payload}"
-#         ) from key
-#     except Exception as error:
-#         raise EcoFlowIoTOpenError(
-#             f"Failed to parse response: {response.text} Error: {error}"
-#         ) from error
-
-#     if response_message.lower() != "success":
-#         raise EcoFlowIoTOpenError(f"{response_message}")
-
-#     return payload
