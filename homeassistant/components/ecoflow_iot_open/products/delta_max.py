@@ -1,6 +1,11 @@
 """EcoFlow DELTA Max."""
 
-from typing import Union
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntityDescription,
+    SensorStateClass,
+)
+from homeassistant.const import PERCENTAGE
 
 from . import Device
 
@@ -8,15 +13,39 @@ from . import Device
 class DELTAMax(Device):
     """DELTA Max."""
 
+    def sensors(self) -> list[SensorEntityDescription]:
+        """Available sensors for DELTA Max."""
+        return [
+            SensorEntityDescription(
+                key="bmsMaster.soc",
+                name="battery_level_int",
+                device_class=SensorDeviceClass.BATTERY,
+                native_unit_of_measurement=PERCENTAGE,
+                state_class=SensorStateClass.MEASUREMENT,
+            ),
+            SensorEntityDescription(
+                key="bmsMaster.f32ShowSoc",
+                name="battery_level_decimal",
+                device_class=SensorDeviceClass.BATTERY,
+                native_unit_of_measurement=PERCENTAGE,
+                state_class=SensorStateClass.MEASUREMENT,
+            ),
+        ]
+
     def __init__(self, device_info: dict, api_interface) -> None:
         """Initialize."""
         super().__init__(device_info, api_interface)
         self._model = "DELTA Max"
 
-    @property
-    def battery_level(self) -> Union[int, None]:
-        """Return the value 0-100? of the battery level."""
-        return self._device_info.get("bmsMaster.soc")
+    # @property
+    # def battery_level_int(self) -> Union[int, None]:
+    #     """Return the integer value 0-100? of the battery level."""
+    #     return self._device_info.get("bmsMaster.soc")
+
+    # @property
+    # def battery_level_decimal(self) -> Union[Decimal, None]:
+    #     """Return the decimal value 0-100? of the battery level."""
+    #     return self._device_info.get("bmsMaster.f32ShowSoc")
 
 
 # quota all response

@@ -1,5 +1,6 @@
 """API Interface for EcoFlow IoT Open Integration."""
 
+import asyncio
 import hashlib
 import hmac
 import json
@@ -10,11 +11,14 @@ import time
 from typing import Any, TypeVar
 
 from aiohttp import ClientSession
-from aiomqtt import Client, MqttError as AioMqttError
+import aiomqtt
+from aiomqtt import Client
 from multidict import CIMultiDict
-from paho.mqtt import client as mqtt
 
-from .errors import GenericHTTPError, InvalidResponseFormat, MqttError
+# from paho.mqtt import client as mqtt
+from reactivex import Observable, Subject
+
+from .errors import GenericHTTPError, InvalidResponseFormat
 from .products import (
     DELTA_MAX,
     POWERSTREAM,
@@ -39,6 +43,55 @@ _CLIENT_LOGGER = logging.getLogger(f"{__name__}.client")
 ApiType = TypeVar("ApiType", bound="EcoFlowIoTOpenAPIInterface")
 
 
+class EcoFlowIoTOpenDataHolder:
+    """Data holder for the params of all available EcoFlow devices."""
+
+    def __init__(self) -> None:
+        """Initialize."""
+        self.params = dict[str, dict[str, dict[str, Any]]]()
+        self.__params_observable = Subject[dict[str, Any]]()
+
+    def params_observable(self) -> Observable[dict[str, Any]]:
+        """Return observable params."""
+        return self.__params_observable
+
+    def update_params(
+        self,
+        raw: dict[str, Any],
+        # product: str,
+        serial_number: str,
+    ):
+        """Update the device params."""
+        # For devices like PowerStream and Single Axis Solar Tracker we receive "param" instead of "params"
+        if raw.get("param"):
+            raw["params"] = raw["param"]
+
+        if raw.get("params"):
+            # For devices like PowerStream and Single Axis Solar Tracker we receive the params values without prefix
+            if isinstance(raw.get("addr"), str):
+                prefixed_params = {
+                    f"{raw.get("addr")}.{key}": value
+                    for key, value in raw["params"].items()
+                }
+                raw["params"] = prefixed_params
+            # if not self.params.get(product):
+            #     self.params[product] = {}
+            # if not self.params[product].get(serial_number):
+            #     self.params[product][serial_number] = {}
+            # self.params[product][serial_number].update(raw["params"])
+
+            if not self.params.get(serial_number):
+                self.params[serial_number] = {}
+            self.params[serial_number].update(raw["params"])
+            self.__broadcast()
+        else:
+            _LOGGER.error("Missing params in update dictionary: %s", raw)
+
+    def __broadcast(self):
+        """Broadcoast updated device params."""
+        self.__params_observable.on_next(self.params)
+
+
 class EcoFlowIoTOpenAPIInterface:
     """API interface object."""
 
@@ -55,7 +108,12 @@ class EcoFlowIoTOpenAPIInterface:
         self._certificateAccount: str
         self._certificatePassword: str
         self._products: dict[ProductType, dict[str, Device]] = {}
-        self._mqtt_client: mqtt.Client
+        self._mqtt_client: Client
+        # self._mqtt_client: (
+        #     mqtt.Client
+        # )
+        self.mqtt_listener = None
+        self.data = EcoFlowIoTOpenDataHolder()
 
     @property
     def certificateAccount(self) -> str:
@@ -77,25 +135,25 @@ class EcoFlowIoTOpenAPIInterface:
         await this_class._authenticate(accessKey, secretKey)
         return this_class
 
-    async def verify_mqtt_config(self) -> None:
-        """Verify config by connecting to the broker."""
-        try:
-            async with await self._get_client():
-                _LOGGER.debug("Connection successful")
-        except AioMqttError as ex:
-            _LOGGER.warning("Cannot connect", exc_info=True)
-            raise MqttError("Cannot connect") from ex
+    # async def verify_mqtt_config(self) -> None:
+    #     """Verify config by connecting to the broker."""
+    #     try:
+    #         async with await self._get_client():
+    #             _LOGGER.debug("Connection successful")
+    #     except AioMqttError as ex:
+    #         _LOGGER.warning("Cannot connect", exc_info=True)
+    #         raise MqttError("Cannot connect") from ex
 
-    async def _get_client(self) -> Client:
-        """Get MQTT client."""
-        return Client(
-            hostname=MQTT_HOST,
-            port=MQTT_PORT,
-            username=self.certificateAccount,
-            password=self.certificatePassword,
-            logger=_CLIENT_LOGGER,
-            identifier=self._get_client_id(),
-        )
+    # async def _get_client(self) -> Client:
+    #     """Get MQTT client."""
+    #     return Client(
+    #         hostname=MQTT_HOST,
+    #         port=MQTT_PORT,
+    #         username=self.certificateAccount,
+    #         password=self.certificatePassword,
+    #         logger=_CLIENT_LOGGER,
+    #         identifier=self._get_client_id(),
+    #     )
 
     async def _get_devices(self) -> None:
         """Get a list of all devices for this user."""
@@ -207,111 +265,191 @@ class EcoFlowIoTOpenAPIInterface:
             await _session.close()
         _LOGGER.info("Successfully retrieved MQTT credentials")
 
-    def subscribe(self):
+    async def connect(self):
+        """Connect to EcoFlow IoT Open mqtt broker."""
+        self.mqtt_listener = asyncio.create_task(self.subscribe())
+
+    async def subscribe(self):
         """Subscribe to the MQTT updates."""
 
         if not self._products:
             _LOGGER.error("No products found. Did you call setup before subscribing?")
             return False
 
-        self._mqtt_client = mqtt.Client(
-            client_id=self._get_client_id(),
-            clean_session=True,
-            reconnect_on_failure=True,
-        )
-        self._mqtt_client.username_pw_set(
-            self.certificateAccount, self.certificatePassword
-        )
-        self._mqtt_client.tls_set(
-            certfile=None, keyfile=None, cert_reqs=ssl.CERT_REQUIRED
-        )
-        self._mqtt_client.tls_insecure_set(False)
-        self._mqtt_client.on_connect = self._on_connect
-        self._mqtt_client.on_message = self._on_message
-        self._mqtt_client.on_disconnect = self._on_disconnect
-        self._mqtt_client.connect_async(MQTT_HOST, MQTT_PORT)
-        self._mqtt_client.loop_start()
+        # class TLSParameters:
+        #     ca_certs: str | None = None
+        #     certfile: str | None = None
+        #     keyfile: str | None = None
+        #     cert_reqs: ssl.VerifyMode | None = None
+        #     tls_version: Any | None = None
+        #     ciphers: str | None = None
+        #     keyfile_password: str | None = None
 
-    def unsubscribe(self) -> None:
-        """Unsubscribe to the MQTT updates."""
-        self._mqtt_client.loop_stop(force=True)
-
-    def disconnect(self) -> None:
-        """Disconnect from the MQTT broker."""
-        self._mqtt_client.disconnect()
-
-    def _on_connect(
-        self,
-        client: mqtt.Client,
-        userdata: None,
-        _flags: dict[str, int],
-        result_code: int,
-    ):
-        match result_code:
-            case 0:
-                _LOGGER.debug("Connected with result code: %s", str(result_code))
-                _topic_QoS: list = []
-                for _devices in self._products.values():
-                    for _device in _devices.values():
-                        _topic_QoS.append(
-                            (
-                                f"/open/{self.certificateAccount}/{_device.serial_number}/status",
-                                1,
-                            )
+        async with Client(
+            hostname=MQTT_HOST,
+            port=MQTT_PORT,
+            username=self.certificateAccount,
+            password=self.certificatePassword,
+            logger=_CLIENT_LOGGER,
+            identifier=self._get_client_id(),
+            tls_insecure=False,
+            tls_params=aiomqtt.TLSParameters(
+                cert_reqs=ssl.CERT_REQUIRED,
+                certfile=None,
+                keyfile=None,
+            ),
+        ) as client:
+            _topic_QoS: list = []
+            for _devices in self._products.values():
+                for _device in _devices.values():
+                    _topic_QoS.append(
+                        (
+                            f"/open/{self.certificateAccount}/{_device.serial_number}/status",
+                            1,
                         )
-                        _topic_QoS.append(
-                            (
-                                f"/open/{self.certificateAccount}/{_device.serial_number}/quota",
-                                1,
-                            )
+                    )
+                    _topic_QoS.append(
+                        (
+                            f"/open/{self.certificateAccount}/{_device.serial_number}/quota",
+                            1,
                         )
-                client.subscribe(_topic_QoS)
-            case -1:
-                _LOGGER.error("Failed to connect to MQTT: connection timed out")
-            case 1:
-                _LOGGER.error("Failed to connect to MQTT: incorrect protocol version")
-            case 2:
-                _LOGGER.error("Failed to connect to MQTT: invalid client identifier")
-            case 3:
-                _LOGGER.error("Failed to connect to MQTT: server unavailable")
-            case 4:
-                _LOGGER.error("Failed to connect to MQTT: bad username or password")
-            case 5:
-                _LOGGER.error("Failed to connect to MQTT: not authorised")
-            case _:
-                _LOGGER.error(
-                    "Failed to connect to MQTT: another error occurred: %s", result_code
-                )
+                    )
+            await client.subscribe(_topic_QoS)
+            async for message in client.messages:
+                if isinstance(message.payload, bytes):
+                    unpacked_json: dict[str, Any] = json.loads(message.payload)
+                    _LOGGER.debug("MQTT message from topic: %s", message.topic)
+                    _LOGGER.debug(json.dumps(unpacked_json, indent=2, sort_keys=True))
+                    _serial_number: str = message.topic.value.split("/")[3]
+                    _productType: ProductType = ProductType.UNKNOWN
+                    _sn_prefix: str = _serial_number[:4]
+                    if _sn_prefix == DELTA_MAX:
+                        _productType = ProductType.DELTA_MAX
+                    elif _sn_prefix == SINGLE_AXIS_SOLAR_TRACKER:
+                        _productType = ProductType.SINGLE_AXIS_SOLAR_TRACKER
+                    elif _sn_prefix == POWERSTREAM:
+                        _productType = ProductType.POWERSTREAM
+                    elif _sn_prefix == SMART_PLUG:
+                        _productType = ProductType.SMART_PLUG
 
-    def _on_message(self, client: mqtt.Client, userdata: None, msg: mqtt.MQTTMessage):
-        """When a MQTT message comes in push that update to the specified devices."""
-        unpacked_json: dict[str, Any] = json.loads(msg.payload)
-        _LOGGER.debug("MQTT message from topic: %s", msg.topic)
-        _LOGGER.debug(json.dumps(unpacked_json, indent=2, sort_keys=True))
-        _serial_number: str = msg.topic.split("/")[3]
-        _productType: ProductType = ProductType.UNKNOWN
-        _sn_prefix: str = _serial_number[:4]
-        if _sn_prefix == DELTA_MAX:
-            _productType = ProductType.DELTA_MAX
-        elif _sn_prefix == SINGLE_AXIS_SOLAR_TRACKER:
-            _productType = ProductType.SINGLE_AXIS_SOLAR_TRACKER
-        elif _sn_prefix == POWERSTREAM:
-            _productType = ProductType.POWERSTREAM
-        elif _sn_prefix == SMART_PLUG:
-            _productType = ProductType.SMART_PLUG
+                    if _productType != ProductType.UNKNOWN:
+                        # _device = self._products[_productType][_serial_number]
+                        # _device.update_params(unpacked_json)
+                        self.data.update_params(
+                            raw=unpacked_json,
+                            # product=_productType.name,
+                            serial_number=_serial_number,
+                        )
+                        # _device.update_device_info(unpacked_json)
+                    else:
+                        _LOGGER.error(
+                            "Device with serial number %s not found", _serial_number
+                        )
+                # # self._mqtt_client = await self._get_client()
+                # mqtt.Client(
+                #     client_id=self._get_client_id(),
+                #     clean_session=True,
+                #     reconnect_on_failure=True,
+                # )
+                # self._mqtt_client.username_pw_set(
+                #     self.certificateAccount, self.certificatePassword
+                # )
+                # self._mqtt_client.tls_set(
+                #     certfile=None, keyfile=None, cert_reqs=ssl.CERT_REQUIRED
+                # )
+                # self._mqtt_client.tls_insecure_set(False)
+                # self._mqtt_client._on_connect = self._on_connect
+                # self._mqtt_client.on_message = self._on_message
+                # self._mqtt_client.on_disconnect = self._on_disconnect
+                # self._mqtt_client.connect_async(MQTT_HOST, MQTT_PORT)
+                # self._mqtt_client.loop_start()
 
-        if _productType != ProductType.UNKNOWN:
-            _device = self._products[_productType][_serial_number]
-            _device.update_device_info(unpacked_json)
-        else:
-            _LOGGER.error("Device with serial number %s not found", _serial_number)
+                # def unsubscribe(self) -> None:
+                #     """Unsubscribe to the MQTT updates."""
+                #     self._mqtt_client.loop_stop(force=True)
 
-    def _on_disconnect(self, client: mqtt.Client, userdata: None, result_code: int):
-        _LOGGER.debug("Disconnected with result code: %s", str(result_code))
-        if result_code != 0:
-            _LOGGER.error(
-                "EcoFlowIoTOpen MQTT unexpected disconnect. Attempting no reconnect for now"
-            )
+                # def disconnect(self) -> None:
+                #     """Disconnect from the MQTT broker."""
+                #     self._mqtt_client.disconnect()
+
+                # def _on_connect(
+                #     self,
+                #     client: Client,
+                #     userdata: None,
+                #     _flags: dict[str, int],
+                #     result_code: int,
+                # ):
+                #     match result_code:
+                #         case 0:
+                #             _LOGGER.debug("Connected with result code: %s", str(result_code))
+                #             _topic_QoS: list = []
+                #             for _devices in self._products.values():
+                #                 for _device in _devices.values():
+                #                     _topic_QoS.append(
+                #                         (
+                #                             f"/open/{self.certificateAccount}/{_device.serial_number}/status",
+                #                             1,
+                #                         )
+                #                     )
+                #                     _topic_QoS.append(
+                #                         (
+                #                             f"/open/{self.certificateAccount}/{_device.serial_number}/quota",
+                #                             1,
+                #                         )
+                #                     )
+                #             client.subscribe(_topic_QoS)
+                #         case -1:
+                #             _LOGGER.error("Failed to connect to MQTT: connection timed out")
+                #         case 1:
+                #             _LOGGER.error("Failed to connect to MQTT: incorrect protocol version")
+                #         case 2:
+                #             _LOGGER.error("Failed to connect to MQTT: invalid client identifier")
+                #         case 3:
+                #             _LOGGER.error("Failed to connect to MQTT: server unavailable")
+                #         case 4:
+                #             _LOGGER.error("Failed to connect to MQTT: bad username or password")
+                #         case 5:
+                #             _LOGGER.error("Failed to connect to MQTT: not authorised")
+                #         case _:
+                #             _LOGGER.error(
+                #                 "Failed to connect to MQTT: another error occurred: %s", result_code
+                #             )
+
+    # def _on_message(self, client: mqtt.Client, userdata: None, msg: mqtt.MQTTMessage):
+    #     """When a MQTT message comes in push that update to the specified devices."""
+    #     unpacked_json: dict[str, Any] = json.loads(msg.payload)
+    #     _LOGGER.debug("MQTT message from topic: %s", msg.topic)
+    #     _LOGGER.debug(json.dumps(unpacked_json, indent=2, sort_keys=True))
+    #     _serial_number: str = msg.topic.split("/")[3]
+    #     _productType: ProductType = ProductType.UNKNOWN
+    #     _sn_prefix: str = _serial_number[:4]
+    #     if _sn_prefix == DELTA_MAX:
+    #         _productType = ProductType.DELTA_MAX
+    #     elif _sn_prefix == SINGLE_AXIS_SOLAR_TRACKER:
+    #         _productType = ProductType.SINGLE_AXIS_SOLAR_TRACKER
+    #     elif _sn_prefix == POWERSTREAM:
+    #         _productType = ProductType.POWERSTREAM
+    #     elif _sn_prefix == SMART_PLUG:
+    #         _productType = ProductType.SMART_PLUG
+
+    #     if _productType != ProductType.UNKNOWN:
+    #         # _device = self._products[_productType][_serial_number]
+    #         # _device.update_params(unpacked_json)
+    #         self.data.update_params(
+    #             raw=unpacked_json,
+    #             # product=_productType.name,
+    #             serial_number=_serial_number,
+    #         )
+    #         # _device.update_device_info(unpacked_json)
+    #     else:
+    #         _LOGGER.error("Device with serial number %s not found", _serial_number)
+
+    # def _on_disconnect(self, client: mqtt.Client, userdata: None, result_code: int):
+    #     _LOGGER.debug("Disconnected with result code: %s", str(result_code))
+    #     if result_code != 0:
+    #         _LOGGER.error(
+    #             "EcoFlowIoTOpen MQTT unexpected disconnect. Attempting no reconnect for now"
+    #         )
 
     def _get_client_id(self) -> str:
         return f"{self._accessKey}_HomeAssistant"
