@@ -1,6 +1,11 @@
 """EcoFlow Smart Plug."""
 
-from typing import Union
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntityDescription,
+    SensorStateClass,
+)
+from homeassistant.const import UnitOfPower
 
 from . import Device
 
@@ -8,19 +13,31 @@ from . import Device
 class SmartPlug(Device):
     """Smart Plug."""
 
+    def sensors(self) -> list[SensorEntityDescription]:
+        """Available sensors for Smart Plug."""
+        return [
+            SensorEntityDescription(
+                key="iot.watts",
+                name="watts",
+                device_class=SensorDeviceClass.POWER,
+                native_unit_of_measurement=UnitOfPower.WATT,
+                state_class=SensorStateClass.MEASUREMENT,
+            ),
+        ]
+
     def __init__(self, device_info: dict, api_interface) -> None:
         """Initialize."""
         super().__init__(device_info, api_interface)
         self._model = "Smart Plug"
 
-    @property
-    def watts(self) -> Union[float, None]:
-        """Return the integer value 0-2500 of the smart plug consumer watts."""
+    # @property
+    # def watts(self) -> Union[float, None]:
+    #     """Return the integer value 0-2500 of the smart plug consumer watts."""
 
-        watts: float | None = self._device_info.get("watts")
-        if watts is None:
-            return None
-        return watts * 0.1
+    #     watts: float | None = self._device_info.get("watts")
+    #     if watts is None:
+    #         return None
+    #     return watts * 0.1
 
 
 # quota all response without key prefix

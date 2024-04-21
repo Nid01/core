@@ -4,6 +4,8 @@ from enum import Enum
 import logging
 from typing import Any
 
+from homeassistant.components.sensor import SensorEntityDescription
+
 _LOGGER = logging.getLogger(__name__)
 
 DELTA_MAX = "DAEB"  # productType = 13
@@ -55,26 +57,42 @@ class Device:
         """Take a dictionary and update the stored _device_info based on the present dict fields."""
         _set = False
         _json_key: str
-        if self.type in (ProductType.POWERSTREAM, ProductType.SMART_PLUG):
+        if self.type in (
+            ProductType.POWERSTREAM,
+            ProductType.SINGLE_AXIS_SOLAR_TRACKER,
+            ProductType.SMART_PLUG,
+        ):
             _json_key = "param"
         else:
             _json_key = "params"
-        for key, value in update[_json_key].items():
-            try:
+
+        if update.get("addr"):
+            _prefix = str(update.get("addr")) + "."
+        else:
+            _prefix = ""
+
+        try:
+            for key, value in update[_json_key].items():
                 if isinstance(value, dict):
                     for _key, _value in value.items():
                         self._device_info[key][_key] = _value
                 elif key == "status":
                     self._device_info["online"] = value
                 else:
-                    self._device_info[key] = value
-            except Exception:  # pylint: disable=broad-exception-caught
-                _LOGGER.error("Failed to update with message: %d", update)
-            _set = True
+                    self._device_info[_prefix + key] = value
+                _set = True
 
-        if self._update_callback is not None and _set:
-            _LOGGER.debug("Calling the call back to notify updates have occurred")
-            self._update_callback()
+            if self._update_callback is not None and _set:
+                _LOGGER.debug("Calling the call back to notify updates have occurred")
+                self._update_callback()
+        except Exception:  # pylint: disable=broad-exception-caught
+            _LOGGER.error(
+                msg=("Failed to update with message: %d", update), stack_info=True
+            )
+
+    def sensors(self) -> list[SensorEntityDescription]:
+        """Return a empty list of SensorEntityDescription."""
+        return []
 
     @staticmethod
     def _get_productType_for_sn_prefix(value: str) -> ProductType:
