@@ -9,28 +9,28 @@ import random
 import ssl
 import time
 from typing import Any, TypeVar
+import uuid
 
 from aiohttp import ClientSession
 import aiomqtt
-from aiomqtt import Client
+from aiomqtt import Client, MqttCodeError
 from multidict import CIMultiDict
 
 # from paho.mqtt import client as mqtt
-from reactivex import Observable, Subject
-
+from .const import DELTA_MAX, POWERSTREAM, SINGLE_AXIS_SOLAR_TRACKER, SMART_PLUG
+from .data_holder import EcoFlowIoTOpenDataHolder
 from .errors import GenericHTTPError, InvalidResponseFormat
-from .products import (
-    DELTA_MAX,
-    POWERSTREAM,
-    SINGLE_AXIS_SOLAR_TRACKER,
-    SMART_PLUG,
-    Device,
-    ProductType,
-)
+
+# from .products import BaseDevice
+from .products import ProductType
 from .products.delta_max import DELTAMax
 from .products.powerstream import PowerStream
 from .products.single_axis_solar_tracker import SingleAxisSolarTracker
 from .products.smart_plug import SmartPlug
+
+# from .products.powerstream import PowerStream
+# from .products.single_axis_solar_tracker import SingleAxisSolarTracker
+# from .products.smart_plug import SmartPlug
 
 HOST = "api.ecoflow.com"
 REST_BASE_URL = f"https://{HOST}/iot-open"
@@ -43,55 +43,6 @@ _CLIENT_LOGGER = logging.getLogger(f"{__name__}.client")
 ApiType = TypeVar("ApiType", bound="EcoFlowIoTOpenAPIInterface")
 
 
-class EcoFlowIoTOpenDataHolder:
-    """Data holder for the params of all available EcoFlow devices."""
-
-    def __init__(self) -> None:
-        """Initialize."""
-        self.params = dict[str, dict[str, dict[str, Any]]]()
-        self.__params_observable = Subject[dict[str, Any]]()
-
-    def params_observable(self) -> Observable[dict[str, Any]]:
-        """Return observable params."""
-        return self.__params_observable
-
-    def update_params(
-        self,
-        raw: dict[str, Any],
-        # product: str,
-        serial_number: str,
-    ):
-        """Update the device params."""
-        # For devices like PowerStream and Single Axis Solar Tracker we receive "param" instead of "params"
-        if raw.get("param"):
-            raw["params"] = raw["param"]
-
-        if raw.get("params"):
-            # For devices like PowerStream and Single Axis Solar Tracker we receive the params values without prefix
-            if isinstance(raw.get("addr"), str):
-                prefixed_params = {
-                    f"{raw.get("addr")}.{key}": value
-                    for key, value in raw["params"].items()
-                }
-                raw["params"] = prefixed_params
-            # if not self.params.get(product):
-            #     self.params[product] = {}
-            # if not self.params[product].get(serial_number):
-            #     self.params[product][serial_number] = {}
-            # self.params[product][serial_number].update(raw["params"])
-
-            if not self.params.get(serial_number):
-                self.params[serial_number] = {}
-            self.params[serial_number].update(raw["params"])
-            self.__broadcast()
-        else:
-            _LOGGER.error("Missing params in update dictionary: %s", raw)
-
-    def __broadcast(self):
-        """Broadcoast updated device params."""
-        self.__params_observable.on_next(self.params)
-
-
 class EcoFlowIoTOpenAPIInterface:
     """API interface object."""
 
@@ -99,6 +50,7 @@ class EcoFlowIoTOpenAPIInterface:
         self,
         accessKey: str,
         secretKey: str,
+        data_holder: EcoFlowIoTOpenDataHolder | None,
     ) -> None:
         """Create an EcoFlow IoT Open API interface object."""
 
@@ -107,13 +59,14 @@ class EcoFlowIoTOpenAPIInterface:
 
         self._certificateAccount: str
         self._certificatePassword: str
-        self._products: dict[ProductType, dict[str, Device]] = {}
+        # self._products: dict[ProductType, dict[str, BaseDevice]] = {}
+        self._products: dict[ProductType, dict[str, Any]] = {}
         self._mqtt_client: Client
         # self._mqtt_client: (
         #     mqtt.Client
-        # )
+        # )  # Done: replace with aiomqtt, to make the client thread safe?
         self.mqtt_listener = None
-        self.data = EcoFlowIoTOpenDataHolder()
+        self._data_holder = data_holder
 
     @property
     def certificateAccount(self) -> str:
@@ -127,11 +80,14 @@ class EcoFlowIoTOpenAPIInterface:
 
     @classmethod
     async def certification(
-        cls: type[ApiType], accessKey: str, secretKey: str
+        cls: type[ApiType],
+        accessKey: str,
+        secretKey: str,
+        data_holder: EcoFlowIoTOpenDataHolder | None,
     ) -> ApiType:
         """Connect to EcoFlow IoT Open API and fetch MQTT credentials."""
 
-        this_class = cls(accessKey, secretKey)
+        this_class = cls(accessKey, secretKey, data_holder)
         await this_class._authenticate(accessKey, secretKey)
         return this_class
 
@@ -172,13 +128,15 @@ class EcoFlowIoTOpenAPIInterface:
             await _session.close()
 
         if _json_device_list.get("message") == "Success":
-            _products: dict[ProductType, dict[str, Device]] = {}
+            # _products: dict[ProductType, dict[str, BaseDevice]] = {}
+            _products: dict[ProductType, dict[str, Any]] = {}
             for _device in _json_device_list.get("data", {}):
                 _sn_prefix: str = _device.get("sn")[:4]
                 if _sn_prefix == DELTA_MAX:
                     if not _products.get(ProductType.DELTA_MAX):
                         _products[ProductType.DELTA_MAX] = {}
                     deltaMax = DELTAMax(_device, self)
+                    # deltaMax = _device
                     _products[ProductType.DELTA_MAX][deltaMax.serial_number] = deltaMax
                 elif _sn_prefix == SINGLE_AXIS_SOLAR_TRACKER:
                     if not _products.get(ProductType.SINGLE_AXIS_SOLAR_TRACKER):
@@ -231,13 +189,15 @@ class EcoFlowIoTOpenAPIInterface:
         if not self._products:
             await self._get_devices()
 
-        _products: dict[ProductType, dict[str, Device]] = {}
+        # _products: dict[ProductType, dict[str, BaseDevice]] = {}
+        _products: dict[ProductType, dict[str, Any]] = {}
         for _product_type in product_type:
             _products[_product_type] = {}
         for _devices in self._products.values():
             for _device in _devices.values():
                 if _device.type in product_type:
                     _products[_device.type][_device.serial_number] = _device
+        self._products = _products
         return _products
 
     async def _authenticate(self, accessKey: str, secretKey: str) -> None:
@@ -267,192 +227,162 @@ class EcoFlowIoTOpenAPIInterface:
 
     async def connect(self):
         """Connect to EcoFlow IoT Open mqtt broker."""
+        if self.mqtt_listener is not None:
+            _LOGGER.warning("MQTT listener is already running")
+            return
         self.mqtt_listener = asyncio.create_task(self.subscribe())
+
+    async def disconnect(self):
+        """Disconnect the MQTT listener."""
+        if self.mqtt_listener:
+            self.mqtt_listener.cancel()
+            try:
+                await self.mqtt_listener
+            except asyncio.CancelledError:
+                _LOGGER.info("MQTT listener task has been cancelled")
+            self.mqtt_listener = None
+        else:
+            _LOGGER.warning("MQTT listener is not running")
 
     async def subscribe(self):
         """Subscribe to the MQTT updates."""
 
-        if not self._products:
-            _LOGGER.error("No products found. Did you call setup before subscribing?")
-            return False
-
-        # class TLSParameters:
-        #     ca_certs: str | None = None
-        #     certfile: str | None = None
-        #     keyfile: str | None = None
-        #     cert_reqs: ssl.VerifyMode | None = None
-        #     tls_version: Any | None = None
-        #     ciphers: str | None = None
-        #     keyfile_password: str | None = None
-
-        async with Client(
-            hostname=MQTT_HOST,
-            port=MQTT_PORT,
-            username=self.certificateAccount,
-            password=self.certificatePassword,
-            logger=_CLIENT_LOGGER,
-            identifier=self._get_client_id(),
-            tls_insecure=False,
-            tls_params=aiomqtt.TLSParameters(
-                cert_reqs=ssl.CERT_REQUIRED,
-                certfile=None,
-                keyfile=None,
-            ),
-        ) as client:
-            _topic_QoS: list = []
-            for _devices in self._products.values():
-                for _device in _devices.values():
-                    _topic_QoS.append(
-                        (
-                            f"/open/{self.certificateAccount}/{_device.serial_number}/status",
-                            1,
-                        )
+        while True:
+            try:
+                if not self._products:
+                    _LOGGER.error(
+                        "No products found. Did you call setup before subscribing?"
                     )
-                    _topic_QoS.append(
-                        (
-                            f"/open/{self.certificateAccount}/{_device.serial_number}/quota",
-                            1,
+                    return False
+
+                # class TLSParameters:
+                #     ca_certs: str | None = None
+                #     certfile: str | None = None
+                #     keyfile: str | None = None
+                #     cert_reqs: ssl.VerifyMode | None = None
+                #     tls_version: Any | None = None
+                #     ciphers: str | None = None
+                #     keyfile_password: str | None = None
+
+                async with Client(
+                    hostname=MQTT_HOST,
+                    port=MQTT_PORT,
+                    username=self.certificateAccount,
+                    password=self.certificatePassword,
+                    logger=_CLIENT_LOGGER,
+                    identifier=self._get_client_id(),
+                    tls_insecure=False,
+                    tls_params=aiomqtt.TLSParameters(
+                        cert_reqs=ssl.CERT_REQUIRED,
+                        certfile=None,
+                        keyfile=None,
+                    ),
+                ) as client:
+                    _topic_QoS: list = []
+                    for _devices in self._products.values():
+                        for _device in _devices.values():
+                            _topic_QoS.append(
+                                (
+                                    f"/open/{self.certificateAccount}/{_device.serial_number}/status",
+                                    1,
+                                )
+                            )
+                            _topic_QoS.append(
+                                (
+                                    f"/open/{self.certificateAccount}/{_device.serial_number}/quota",
+                                    1,
+                                )
+                            )
+                    await client.subscribe(_topic_QoS)
+                    async for message in client.messages:
+                        if isinstance(message.payload, bytes):
+                            unpacked_json: dict[str, Any] = json.loads(message.payload)
+                            _LOGGER.debug("MQTT message from topic: %s", message.topic)
+                            _LOGGER.debug(
+                                json.dumps(unpacked_json, indent=2, sort_keys=True)
+                            )
+                            _serial_number: str = message.topic.value.split("/")[3]
+                            _productType: ProductType = ProductType.UNKNOWN
+                            _sn_prefix: str = _serial_number[:4]
+                            if _sn_prefix == DELTA_MAX:
+                                _productType = ProductType.DELTA_MAX
+                            elif _sn_prefix == SINGLE_AXIS_SOLAR_TRACKER:
+                                _productType = ProductType.SINGLE_AXIS_SOLAR_TRACKER
+                            elif _sn_prefix == POWERSTREAM:
+                                _productType = ProductType.POWERSTREAM
+                            elif _sn_prefix == SMART_PLUG:
+                                _productType = ProductType.SMART_PLUG
+
+                            if _productType != ProductType.UNKNOWN:
+                                # _device = self._products[_productType][_serial_number]
+                                # _device.update_params(unpacked_json)
+
+                                if unpacked_json.get("param"):
+                                    unpacked_json["params"] = unpacked_json["param"]
+
+                                if isinstance(unpacked_json.get("addr"), str):
+                                    prefixed_params = {
+                                        f"{unpacked_json.get("addr")}.{key}": value
+                                        for key, value in unpacked_json[
+                                            "params"
+                                        ].items()
+                                    }
+                                    unpacked_json["params"] = prefixed_params
+                                if isinstance(
+                                    self._data_holder, EcoFlowIoTOpenDataHolder
+                                ):
+                                    self._data_holder.update_params(
+                                        raw=unpacked_json["params"],
+                                        # product=_productType.name,
+                                        serial_number=_serial_number,
+                                    )
+                                # _device.update_device_info(unpacked_json)
+                            else:
+                                _LOGGER.error(
+                                    "Device with serial number %s not found",
+                                    _serial_number,
+                                )
+            except MqttCodeError:
+                _LOGGER.exception("Exception during subscription")
+
+    async def initializeDevices(self) -> None:
+        """Retrieve initial data of all devices via HTTP request."""
+
+        for _devices in self._products.values():
+            for _device in _devices.values():
+                _params = {"sn": _device.serial_number}
+                _headers = create_headers(self._accessKey, self._secretKey, _params)
+                _session = ClientSession()
+                try:
+                    async with _session.get(
+                        f"{REST_BASE_URL}/sign/device/quota/all",
+                        headers=_headers,
+                        params=_params,
+                    ) as response:
+                        if response.status == 200:
+                            _json_device_quota_all = await response.json()
+                            _LOGGER.debug(_json_device_quota_all)
+                        else:
+                            raise GenericHTTPError(response.status)
+                finally:
+                    await _session.close()
+
+                if _json_device_quota_all.get("message") == "Success":
+                    _sn_prefix: str = _device.serial_number[:4]
+                    if _sn_prefix == POWERSTREAM:
+                        modified_prefix_params = {
+                            f"iot.{str(key).split('.', 2)[-1]}": value
+                            for key, value in _json_device_quota_all["data"].items()
+                        }
+                        _json_device_quota_all["data"] = modified_prefix_params
+                    if isinstance(self._data_holder, EcoFlowIoTOpenDataHolder):
+                        self._data_holder.update_params(
+                            raw=_json_device_quota_all.get("data", {}),
+                            serial_number=_device.serial_number,
                         )
-                    )
-            await client.subscribe(_topic_QoS)
-            async for message in client.messages:
-                if isinstance(message.payload, bytes):
-                    unpacked_json: dict[str, Any] = json.loads(message.payload)
-                    _LOGGER.debug("MQTT message from topic: %s", message.topic)
-                    _LOGGER.debug(json.dumps(unpacked_json, indent=2, sort_keys=True))
-                    _serial_number: str = message.topic.value.split("/")[3]
-                    _productType: ProductType = ProductType.UNKNOWN
-                    _sn_prefix: str = _serial_number[:4]
-                    if _sn_prefix == DELTA_MAX:
-                        _productType = ProductType.DELTA_MAX
-                    elif _sn_prefix == SINGLE_AXIS_SOLAR_TRACKER:
-                        _productType = ProductType.SINGLE_AXIS_SOLAR_TRACKER
-                    elif _sn_prefix == POWERSTREAM:
-                        _productType = ProductType.POWERSTREAM
-                    elif _sn_prefix == SMART_PLUG:
-                        _productType = ProductType.SMART_PLUG
-
-                    if _productType != ProductType.UNKNOWN:
-                        # _device = self._products[_productType][_serial_number]
-                        # _device.update_params(unpacked_json)
-                        self.data.update_params(
-                            raw=unpacked_json,
-                            # product=_productType.name,
-                            serial_number=_serial_number,
-                        )
-                        # _device.update_device_info(unpacked_json)
-                    else:
-                        _LOGGER.error(
-                            "Device with serial number %s not found", _serial_number
-                        )
-                # # self._mqtt_client = await self._get_client()
-                # mqtt.Client(
-                #     client_id=self._get_client_id(),
-                #     clean_session=True,
-                #     reconnect_on_failure=True,
-                # )
-                # self._mqtt_client.username_pw_set(
-                #     self.certificateAccount, self.certificatePassword
-                # )
-                # self._mqtt_client.tls_set(
-                #     certfile=None, keyfile=None, cert_reqs=ssl.CERT_REQUIRED
-                # )
-                # self._mqtt_client.tls_insecure_set(False)
-                # self._mqtt_client._on_connect = self._on_connect
-                # self._mqtt_client.on_message = self._on_message
-                # self._mqtt_client.on_disconnect = self._on_disconnect
-                # self._mqtt_client.connect_async(MQTT_HOST, MQTT_PORT)
-                # self._mqtt_client.loop_start()
-
-                # def unsubscribe(self) -> None:
-                #     """Unsubscribe to the MQTT updates."""
-                #     self._mqtt_client.loop_stop(force=True)
-
-                # def disconnect(self) -> None:
-                #     """Disconnect from the MQTT broker."""
-                #     self._mqtt_client.disconnect()
-
-                # def _on_connect(
-                #     self,
-                #     client: Client,
-                #     userdata: None,
-                #     _flags: dict[str, int],
-                #     result_code: int,
-                # ):
-                #     match result_code:
-                #         case 0:
-                #             _LOGGER.debug("Connected with result code: %s", str(result_code))
-                #             _topic_QoS: list = []
-                #             for _devices in self._products.values():
-                #                 for _device in _devices.values():
-                #                     _topic_QoS.append(
-                #                         (
-                #                             f"/open/{self.certificateAccount}/{_device.serial_number}/status",
-                #                             1,
-                #                         )
-                #                     )
-                #                     _topic_QoS.append(
-                #                         (
-                #                             f"/open/{self.certificateAccount}/{_device.serial_number}/quota",
-                #                             1,
-                #                         )
-                #                     )
-                #             client.subscribe(_topic_QoS)
-                #         case -1:
-                #             _LOGGER.error("Failed to connect to MQTT: connection timed out")
-                #         case 1:
-                #             _LOGGER.error("Failed to connect to MQTT: incorrect protocol version")
-                #         case 2:
-                #             _LOGGER.error("Failed to connect to MQTT: invalid client identifier")
-                #         case 3:
-                #             _LOGGER.error("Failed to connect to MQTT: server unavailable")
-                #         case 4:
-                #             _LOGGER.error("Failed to connect to MQTT: bad username or password")
-                #         case 5:
-                #             _LOGGER.error("Failed to connect to MQTT: not authorised")
-                #         case _:
-                #             _LOGGER.error(
-                #                 "Failed to connect to MQTT: another error occurred: %s", result_code
-                #             )
-
-    # def _on_message(self, client: mqtt.Client, userdata: None, msg: mqtt.MQTTMessage):
-    #     """When a MQTT message comes in push that update to the specified devices."""
-    #     unpacked_json: dict[str, Any] = json.loads(msg.payload)
-    #     _LOGGER.debug("MQTT message from topic: %s", msg.topic)
-    #     _LOGGER.debug(json.dumps(unpacked_json, indent=2, sort_keys=True))
-    #     _serial_number: str = msg.topic.split("/")[3]
-    #     _productType: ProductType = ProductType.UNKNOWN
-    #     _sn_prefix: str = _serial_number[:4]
-    #     if _sn_prefix == DELTA_MAX:
-    #         _productType = ProductType.DELTA_MAX
-    #     elif _sn_prefix == SINGLE_AXIS_SOLAR_TRACKER:
-    #         _productType = ProductType.SINGLE_AXIS_SOLAR_TRACKER
-    #     elif _sn_prefix == POWERSTREAM:
-    #         _productType = ProductType.POWERSTREAM
-    #     elif _sn_prefix == SMART_PLUG:
-    #         _productType = ProductType.SMART_PLUG
-
-    #     if _productType != ProductType.UNKNOWN:
-    #         # _device = self._products[_productType][_serial_number]
-    #         # _device.update_params(unpacked_json)
-    #         self.data.update_params(
-    #             raw=unpacked_json,
-    #             # product=_productType.name,
-    #             serial_number=_serial_number,
-    #         )
-    #         # _device.update_device_info(unpacked_json)
-    #     else:
-    #         _LOGGER.error("Device with serial number %s not found", _serial_number)
-
-    # def _on_disconnect(self, client: mqtt.Client, userdata: None, result_code: int):
-    #     _LOGGER.debug("Disconnected with result code: %s", str(result_code))
-    #     if result_code != 0:
-    #         _LOGGER.error(
-    #             "EcoFlowIoTOpen MQTT unexpected disconnect. Attempting no reconnect for now"
-    #         )
 
     def _get_client_id(self) -> str:
-        return f"{self._accessKey}_HomeAssistant"
+        return f"HomeAssistant_{self._accessKey}_{str(uuid.uuid4()).upper()}"
 
 
 def hmac_sha256(data, key):
