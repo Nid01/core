@@ -37,7 +37,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
 
     try:
         await EcoFlowIoTOpenAPIInterface.certification(
-            data[CONF_ACCESS_KEY], data[CONF_SECRET_KEY]
+            data[CONF_ACCESS_KEY], data[CONF_SECRET_KEY], None
         )
 
     except ClientError:

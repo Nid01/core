@@ -1,46 +1,25 @@
-"""Define a EcoFlow device."""
+"""Base device for EcoFlow products."""
 
-from enum import Enum
+from abc import ABC, abstractmethod
+from collections.abc import Sequence
 import logging
 from typing import Any
 
-from homeassistant.components.sensor import SensorEntityDescription
+from homeassistant.components.sensor import SensorEntity
+
+from ..const import (
+    DELTA_MAX,
+    POWERSTREAM,
+    SINGLE_AXIS_SOLAR_TRACKER,
+    SMART_PLUG,
+    ProductType,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
-DELTA_MAX = "DAEB"  # productType = 13
-# Potentially setup DELTA_MAX_SMART_EXTRA_BATTERY as separate device?
-# DELTA_MAX_SMART_EXTRA_BATTERY = "E2AB"  # productType=13
-POWERSTREAM = "HW51"  # productType=75
-SMART_PLUG = "HW52"
-SINGLE_AXIS_SOLAR_TRACKER = "HZ31"
-# More SN-prefixes required
 
-
-class ProductType(Enum):
-    """Define the equipment product type by DeviceSN-prefix."""
-
-    DELTA_2 = 1
-    RIVER_2 = 2
-    RIVER_2_MAX = 3
-    RIVER_2_PRO = 4
-    DELTA_PRO = 5
-    RIVER_MAX = 6
-    RIVER_PRO = 7
-    DELTA_MAX = 8  # productType = 13
-    DELTA_2_MAX = 9  # productType = 81
-    DELTA_MINI = 15  # productType = 15
-    SINGLE_AXIS_SOLAR_TRACKER = 31
-    WAVE_2 = 45  # productType = 45
-    GLACIER = 46
-    POWERSTREAM = 51
-    SMART_PLUG = 52
-    DIAGNOSTIC = 99
-    UNKNOWN = 100
-
-
-class Device:
-    """Define a device."""
+class BaseDevice(ABC):
+    """Base device for EcoFlow products."""
 
     def __init__(self, device_info: dict, api_interface) -> None:
         """Initialize."""
@@ -48,6 +27,7 @@ class Device:
         self._device_info = device_info
         self._update_callback = None
         self._model: str
+        # self.device_name: str
 
     def set_update_callback(self, callback) -> None:
         """Set update callback for the device."""
@@ -90,9 +70,10 @@ class Device:
                 msg=("Failed to update with message: %d", update), stack_info=True
             )
 
-    def sensors(self) -> list[SensorEntityDescription]:
+    @abstractmethod
+    def sensors(self, dataHolder) -> Sequence[SensorEntity]:
         """Return a empty list of SensorEntityDescription."""
-        return []
+        # pass
 
     @staticmethod
     def _get_productType_for_sn_prefix(value: str) -> ProductType:

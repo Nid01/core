@@ -1,0 +1,46 @@
+{
+  "quota all response": {
+    "iot.angle": 0,
+    "iot.angleManual": 4294967295,
+    "iot.angleTarget": 15,
+    "iot.batteryPercent": 92,
+    "iot.batteryTemperature": 20,
+    "iot.chargeState": 0,
+    "iot.chargeTimer": 1000,
+    "iot.errCode": 301,
+    "iot.lux": 0,
+    "iot.luxGrade": 0,
+    "iot.mode": 0,
+    "iot.scenes": 0,
+    "iot.shake": 0,
+    "iot.switchState": 36,
+    "iot.updateTime": "2024-03-31 02:16:44",
+    "iot.water": 0,
+    "iot.wind": 0,
+    "iot.word": 3
+  },
+  "mqtt data": {
+    "addr": "iot",
+    "cmdFunc": 32,
+    "cmdId": 1,
+    "param": {
+      "angle": 35,
+      "angleManual": 4294967295,
+      "angleTarget": 35,
+      "batteryPercent": 64,
+      "batteryTemperature": 32,
+      "chargeState": 1,
+      "chargeTimer": 1000,
+      "errCode": 3,
+      "lux": 45364,
+      "luxGrade": 1,
+      "mode": 0,
+      "scenes": 0,
+      "shake": 0,
+      "switchState": 52,
+      "water": 0,
+      "wind": 0,
+      "word": 4
+    }
+  }
+}
