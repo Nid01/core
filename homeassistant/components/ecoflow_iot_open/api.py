@@ -19,7 +19,7 @@ from multidict import CIMultiDict
 # from paho.mqtt import client as mqtt
 from .const import DELTA_MAX, POWERSTREAM, SINGLE_AXIS_SOLAR_TRACKER, SMART_PLUG
 from .data_holder import EcoFlowIoTOpenDataHolder
-from .errors import GenericHTTPError, InvalidResponseFormat
+from .errors import GenericHTTPError, InvalidCredentialsError, InvalidResponseFormat
 
 # from .products import BaseDevice
 from .products import ProductType
@@ -218,9 +218,14 @@ class EcoFlowIoTOpenAPIInterface:
                     self._certificatePassword = _json.get("data").get(
                         "certificatePassword"
                     )
+                elif _json.get("message") == "accessKey is invalid":
+                    await _session.close()
+                    raise InvalidCredentialsError(_json)
                 else:
+                    await _session.close()
                     raise InvalidResponseFormat(_json)
             else:
+                await _session.close()
                 raise GenericHTTPError(resp.status)
             await _session.close()
         _LOGGER.info("Successfully retrieved MQTT credentials")
@@ -246,9 +251,8 @@ class EcoFlowIoTOpenAPIInterface:
 
     async def subscribe(self):
         """Subscribe to the MQTT updates."""
-
-        while True:
-            try:
+        try:
+            while True:
                 if not self._products:
                     _LOGGER.error(
                         "No products found. Did you call setup before subscribing?"
@@ -342,8 +346,8 @@ class EcoFlowIoTOpenAPIInterface:
                                     "Device with serial number %s not found",
                                     _serial_number,
                                 )
-            except MqttCodeError:
-                _LOGGER.exception("Exception during subscription")
+        except MqttCodeError:
+            _LOGGER.exception("Exception during subscription")
 
     async def initializeDevices(self) -> None:
         """Retrieve initial data of all devices via HTTP request."""
