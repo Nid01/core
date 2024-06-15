@@ -2,15 +2,15 @@
 
 
 class EcoFlowIoTOpenError(Exception):
-    """EcoFlow IoT Open error."""
+    """Custom exception for EcoFlow IoT Open API errors."""
 
 
 class InvalidCredentialsError(EcoFlowIoTOpenError):
-    """Invalid credentials error."""
+    """Raised when invalid credentials are provided."""
 
 
 class InvalidResponseFormat(EcoFlowIoTOpenError):
-    """Invalid response format error."""
+    """Raised when an invalid response format is received."""
 
 
 class GenericHTTPError(EcoFlowIoTOpenError):
