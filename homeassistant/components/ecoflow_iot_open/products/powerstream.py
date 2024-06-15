@@ -9,7 +9,7 @@ from ..sensor import (
     AmpSensorEntity,
     BrightnessSensorEntity,
     CountSensorEntity,
-    DeciwattsSensorEntity,
+    DeciwattSensorEntity,
     FrequencySensorEntity,
     LevelSensorEntity,
     MiscSensorEntity,
@@ -31,124 +31,207 @@ class PowerStream(BaseDevice):
 
     def sensors(self, dataHolder: EcoFlowIoTOpenDataHolder) -> Sequence[SensorEntity]:
         """Available sensors for PowerStream."""
-        return [
-            # Counter
-            CountSensorEntity(dataHolder, self, "iot.resetCount"),
-            # Wattage
-            DeciwattsSensorEntity(
-                dataHolder=dataHolder, device=self, mqtt_key="iot.invOutputWatts"
-            ),
-            DeciwattsSensorEntity(dataHolder, self, "iot.batInputWatts"),
-            DeciwattsSensorEntity(dataHolder, self, "iot.batErrorInvLoadLimit"),
-            DeciwattsSensorEntity(dataHolder, self, "iot.batOutputLoadLimit"),
-            DeciwattsSensorEntity(dataHolder, self, "iot.consWatt"),
-            DeciwattsSensorEntity(dataHolder, self, "iot.dynamicWatts"),
-            DeciwattsSensorEntity(dataHolder, self, "iot.floadLimitOut"),
-            DeciwattsSensorEntity(dataHolder, self, "iot.geneWatt"),
-            DeciwattsSensorEntity(dataHolder, self, "iot.gridConsWatts"),
-            DeciwattsSensorEntity(dataHolder, self, "iot.invDemandWatts"),
-            DeciwattsSensorEntity(dataHolder, self, "iot.invOutputLoadLimit"),
-            DeciwattsSensorEntity(dataHolder, self, "iot.invToOtherWatts"),
-            DeciwattsSensorEntity(dataHolder, self, "iot.invToPlugWatts"),
-            # DeciwattsSensorEntity(dataHolder, self, "iot.lowerLimit"), # value of 100 doesn't seem to be a valid wattage
-            DeciwattsSensorEntity(dataHolder, self, "iot.permanentWatts"),
-            DeciwattsSensorEntity(dataHolder, self, "iot.plugTotalWatts"),
-            DeciwattsSensorEntity(dataHolder, self, "iot.pv1InputWatts"),
-            DeciwattsSensorEntity(dataHolder, self, "iot.pv2InputWatts"),
-            DeciwattsSensorEntity(dataHolder, self, "iot.pvPowerLimitAcPower"),
-            DeciwattsSensorEntity(dataHolder, self, "iot.pvToInvWatts"),
-            DeciwattsSensorEntity(dataHolder, self, "iot.ratedPower"),
-            DeciwattsSensorEntity(dataHolder, self, "iot.spaceDemandWatts"),
-            # DeciwattsSensorEntity(dataHolder, self, "iot.upperLimit"), # value of 100 doesn't seem to be wattage
-            # Level
-            LevelSensorEntity(
-                dataHolder=dataHolder, device=self, mqtt_key="iot.batSoc"
-            ),
-            # Current
-            AmpSensorEntity(dataHolder, self, "iot.batInputCur"),
-            AmpSensorEntity(dataHolder, self, "iot.bmsReqChgAmp"),
-            AmpSensorEntity(dataHolder, self, "iot.invOutputCur"),
-            AmpSensorEntity(dataHolder, self, "iot.pv1InputCur"),
-            AmpSensorEntity(dataHolder, self, "iot.pv2InputCur"),
-            # Frequency
-            FrequencySensorEntity(dataHolder, self, "iot.invFreq"),
-            # Voltage
-            VoltSensorEntity(dataHolder, self, "iot.batInputVolt"),
-            VoltSensorEntity(dataHolder, self, "iot.batOpVolt"),
-            VoltSensorEntity(dataHolder, self, "iot.invInputVolt"),
-            VoltSensorEntity(dataHolder, self, "iot.invOpVolt"),
-            VoltSensorEntity(dataHolder, self, "iot.llcInputVolt"),
-            VoltSensorEntity(dataHolder, self, "iot.llcOpVolt"),
-            VoltSensorEntity(dataHolder, self, "iot.pv1InputVolt"),
-            VoltSensorEntity(dataHolder, self, "iot.pv1OpVolt"),
-            VoltSensorEntity(dataHolder, self, "iot.pv2InputVolt"),
-            VoltSensorEntity(dataHolder, self, "iot.pv2OpVolt"),
-            # Miscellaneous
-            MiscSensorEntity(dataHolder, self, "iot.acOffFlag"),
-            MiscSensorEntity(dataHolder, self, "iot.antiBackFlowFlag"),
-            MiscSensorEntity(dataHolder, self, "iot.batErrCode"),
-            MiscSensorEntity(dataHolder, self, "iot.batLoadLimitFlag"),
-            MiscSensorEntity(dataHolder, self, "iot.batOffFlag"),
-            MiscSensorEntity(dataHolder, self, "iot.batStatue"),
-            MiscSensorEntity(dataHolder, self, "iot.batSystem"),
-            MiscSensorEntity(dataHolder, self, "iot.batWarningCode"),
-            # MiscSensorEntity(dataHolder, self, "iot.bmsReqChgVol"),  # Values doesn't seem to be voltage
-            MiscSensorEntity(dataHolder, self, "iot.bpType"),
-            MiscSensorEntity(dataHolder, self, "iot.consNum"),
-            MiscSensorEntity(dataHolder, self, "iot.feedProtect"),
-            MiscSensorEntity(dataHolder, self, "iot.geneNum"),
-            MiscSensorEntity(dataHolder, self, "iot.heartbeatFrequency"),
-            MiscSensorEntity(dataHolder, self, "iot.installCountry"),
-            MiscSensorEntity(dataHolder, self, "iot.installTown"),
-            MiscSensorEntity(dataHolder, self, "iot.interfaceConnFlag"),
-            BrightnessSensorEntity(dataHolder, self, "iot.invBrightness"),
-            MiscSensorEntity(dataHolder, self, "iot.invErrCode"),
-            MiscSensorEntity(dataHolder, self, "iot.invLoadLimitFlag"),
-            MiscSensorEntity(dataHolder, self, "iot.invOnOff"),
-            MiscSensorEntity(dataHolder, self, "iot.invRelayStatus"),
-            MiscSensorEntity(dataHolder, self, "iot.invStatue"),
-            MiscSensorEntity(dataHolder, self, "iot.invWarnCode"),
-            MiscSensorEntity(dataHolder, self, "iot.llcErrCode"),
-            MiscSensorEntity(dataHolder, self, "iot.llcOffFlag"),
-            MiscSensorEntity(dataHolder, self, "iot.llcStatue"),
-            MiscSensorEntity(dataHolder, self, "iot.llcWarningCode"),
-            MiscSensorEntity(dataHolder, self, "iot.meshId"),
-            MiscSensorEntity(dataHolder, self, "iot.meshLayel"),
-            MiscSensorEntity(dataHolder, self, "iot.mqttErr"),
-            MiscSensorEntity(dataHolder, self, "iot.parentMac"),
-            MiscSensorEntity(dataHolder, self, "iot.pv1CtrlMpptOffFlag"),
-            MiscSensorEntity(dataHolder, self, "iot.pv1ErrCode"),
-            MiscSensorEntity(dataHolder, self, "iot.pv1RelayStatus"),
-            MiscSensorEntity(dataHolder, self, "iot.pv1Statue"),
-            MiscSensorEntity(dataHolder, self, "iot.pv1WarnCode"),
-            MiscSensorEntity(dataHolder, self, "iot.pv2CtrlMpptOffFlag"),
-            MiscSensorEntity(dataHolder, self, "iot.pv2ErrCode"),
-            MiscSensorEntity(dataHolder, self, "iot.pv2RelayStatus"),
-            MiscSensorEntity(dataHolder, self, "iot.pv2Statue"),
-            MiscSensorEntity(dataHolder, self, "iot.pv2WarningCode"),
-            MiscSensorEntity(dataHolder, self, "iot.resetReason"),
-            MiscSensorEntity(dataHolder, self, "iot.selfMac"),
-            MiscSensorEntity(dataHolder, self, "iot.staIpAddr"),
-            MiscSensorEntity(dataHolder, self, "iot.supplyPriority"),
-            MiscSensorEntity(dataHolder, self, "iot.uwloadLimitFlag"),
-            MiscSensorEntity(dataHolder, self, "iot.uwlowLightFlag"),
-            MiscSensorEntity(dataHolder, self, "iot.uwsocFlag"),
-            MiscSensorEntity(dataHolder, self, "iot.wifiErr"),
-            MiscSensorEntity(dataHolder, self, "iot.wifiRssi"),
-            MiscSensorEntity(dataHolder, self, "iot.wirelessErrCode"),
-            MiscSensorEntity(dataHolder, self, "iot.wirelessWarnCode"),
-            # Temperature
-            TempSensorEntity(dataHolder, self, "iot.batTemp", factor=10),
-            TempSensorEntity(dataHolder, self, "iot.invTemp", factor=10),
-            TempSensorEntity(dataHolder, self, "iot.llcTemp", factor=10),
-            TempSensorEntity(dataHolder, self, "iot.pv1Temp", factor=10),
-            TempSensorEntity(dataHolder, self, "iot.pv2Temp", factor=10),
-            # Time
-            RemainingTimeSensorEntity(dataHolder, self, "iot.chgRemainTime"),
-            RemainingTimeSensorEntity(dataHolder, self, "iot.dsgRemainTime"),
-            # Status
-            StatusSensorEntity(dataHolder, self),
+
+        device_info_keys = set(self._device_info.keys())
+
+        count_keys = [
+            "iot.resetCount",
         ]
+
+        count_sensors = [
+            CountSensorEntity(dataHolder, self, key)
+            for key in count_keys
+            if key in device_info_keys
+        ]
+
+        deciwatt_keys = [
+            "iot.acSetWatts",
+            "iot.antiBackFlowFlag",
+            "iot.batErrorInvLoadLimit",
+            "iot.batInputWatts",
+            "iot.batOutputLoadLimit",
+            "iot.consWatt",
+            "iot.dynamicWatts",
+            "iot.floadLimitOut",
+            "iot.geneWatt",
+            "iot.gridConsWatts",
+            "iot.invDemandWatts",
+            "iot.invOutputLoadLimit",
+            "iot.invOutputWatts",
+            "iot.invToOtherWatts",
+            "iot.invToPlugWatts",
+            "iot.permanentWatts",
+            "iot.plugTotalWatts",
+            "iot.pv1InputWatts",
+            "iot.pv2InputWatts",
+            "iot.pvPowerLimitAcPower",
+            "iot.pvToInvWatts",
+            "iot.ratedPower",
+            "iot.spaceDemandWatts",
+        ]
+
+        deciwatt_sensors = [
+            DeciwattSensorEntity(dataHolder, self, key)
+            for key in deciwatt_keys
+            if key in device_info_keys
+        ]
+
+        level_keys = [
+            "iot.batSoc",
+            "Iot.lowerLimit",
+            "Iot.upperLimit",
+        ]
+
+        level_sensors = [
+            LevelSensorEntity(dataHolder, self, key)
+            for key in level_keys
+            if key in device_info_keys
+        ]
+
+        amp_keys = [
+            "iot.batInputCur",
+            "iot.bmsReqChgAmp",
+            "iot.invOutputCur",
+            "iot.pv1InputCur",
+            "iot.pv2InputCur",
+        ]
+
+        amp_sensors = [
+            AmpSensorEntity(dataHolder, self, key)
+            for key in amp_keys
+            if key in device_info_keys
+        ]
+
+        frequency_keys = [
+            "iot.invFreq",
+        ]
+
+        frequency_sensors = [
+            FrequencySensorEntity(dataHolder, self, key)
+            for key in frequency_keys
+            if key in device_info_keys
+        ]
+
+        voltage_keys = [
+            "iot.batInputVolt",
+            "iot.batOpVolt",
+            "iot.bmsReqChgVol",
+            "iot.invInputVolt",
+            "iot.invOpVolt",
+            "iot.llcInputVolt",
+            "iot.llcOpVolt",
+            "iot.pv1InputVolt",
+            "iot.pv1OpVolt",
+            "iot.pv2InputVolt",
+            "iot.pv2OpVolt",
+        ]
+
+        voltage_sensors = [
+            VoltSensorEntity(dataHolder, self, key)
+            for key in voltage_keys
+            if key in device_info_keys
+        ]
+
+        # milli_voltage_keys = [
+        #     "iot.bmsReqChgVol",
+        # ]
+
+        # milli_voltage_sensors = [
+        #     MilliVoltSensorEntity(dataHolder, self, key)
+        #     for key in milli_voltage_keys
+        #     if key in device_info_keys
+        # ]
+
+        brightness_keys = [
+            "iot.invBrightness",
+        ]
+
+        brightness_sensors = [
+            BrightnessSensorEntity(dataHolder, self, key)
+            for key in brightness_keys
+            if key in device_info_keys
+        ]
+
+        temp_keys = [
+            "iot.batTemp",
+            "iot.invTemp",
+            "iot.llcTemp",
+            "iot.pv1Temp",
+            "iot.pv2Temp",
+        ]
+
+        temp_sensors = [
+            TempSensorEntity(dataHolder, self, key, factor=10)
+            for key in temp_keys
+            if key in device_info_keys
+        ]
+
+        remaining_time_keys = [
+            "iot.chgRemainTime",
+            "iot.dsgRemainTime",
+        ]
+
+        remaining_time_sensors = [
+            RemainingTimeSensorEntity(dataHolder, self, key)
+            for key in remaining_time_keys
+            if key in device_info_keys
+        ]
+
+        ignored_keys = [
+            "iot.updateTime",
+            "iot.wifiErrTime",  # Parse integer value as datetime?
+            "iot.mqttErrTime",  # Parse integer value as datetime?
+            "iot.task1",
+            "iot.task2",
+            "iot.task3",
+            "iot.task4",
+            "iot.task5",
+            "iot.task6",
+            "iot.task7",
+            "iot.task8",
+            "iot.task9",
+            "iot.task10",
+            "iot.task11",
+            "iot.2_1",
+            "iot.2_2",
+            "deviceName",
+            "online",
+            "sn",
+        ]
+
+        found_keys = set(
+            count_keys
+            + deciwatt_keys
+            + level_keys
+            + amp_keys
+            + frequency_keys
+            + voltage_keys
+            # + milli_voltage_keys
+            + brightness_keys
+            + temp_keys
+            + remaining_time_keys
+            + ignored_keys
+        )
+        remaining_keys = device_info_keys - found_keys
+
+        misc_sensors = [
+            MiscSensorEntity(dataHolder, self, key) for key in remaining_keys
+        ]
+
+        return (
+            count_sensors
+            + deciwatt_sensors
+            + level_sensors
+            + amp_sensors
+            + frequency_sensors
+            + voltage_sensors
+            # + milli_voltage_sensors
+            + brightness_sensors
+            + temp_sensors
+            + remaining_time_sensors
+            + misc_sensors
+            + [StatusSensorEntity(dataHolder, self)]
+        )
 
     # def datetimes(...)..
     # DateTimeEntity(dataHolder, self, "iot.updateTime"),

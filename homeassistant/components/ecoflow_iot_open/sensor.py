@@ -230,7 +230,7 @@ class CountSensorEntity(BaseSensorEntity):
 
 
 class MiscSensorEntity(BaseSensorEntity):
-    """Sensor for misc values."""
+    """Sensor for miscellaneous values."""
 
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
@@ -260,15 +260,16 @@ class ScenesSensorEntity(BaseSensorEntity):
             return super()._update_value("Courtyard")
         return super()._update_value(val)
 
-    @property
-    def icon(self) -> str:
+    @cached_property
+    def icon(self) -> str | None:
         """Scenes icon handling."""
 
         if self.state == "Balcony":
             return "mdi:format-text-rotation-angle-up"
         if self.state == "Courtyard":
             return "mdi:angle-acute"
-        return "mdi:eye"
+        return None
+        # return "mdi:eye"
 
 
 class ModeWordSensorEntity(BaseSensorEntity):
@@ -300,8 +301,8 @@ class BeeperSensorEntity(BaseSensorEntity):
             return super()._update_value("On")
         return super()._update_value("Off")
 
-    @property
-    def icon(self) -> str | None:
+    @cached_property
+    def icon(self) -> str:
         """Icon for beeper volume."""
         if self.state == "On":
             return "mdi:volume-high"
@@ -318,8 +319,8 @@ class RainProtectionSensorEntity(BaseSensorEntity):
             return super()._update_value("On")
         return super()._update_value("Off")
 
-    @property
-    def icon(self) -> str | None:
+    @cached_property
+    def icon(self) -> str:
         """Icon for rain protection sensor."""
         if self.state == "On":
             return "mdi:umbrella-outline"
@@ -350,8 +351,8 @@ class WindProtectionSensorEntity(BaseSensorEntity):
             return super()._update_value("On")
         return super()._update_value("Off")
 
-    @property
-    def icon(self) -> str | None:
+    @cached_property
+    def icon(self) -> str:
         """Icon for wind protection sensor."""
         if self.state == "On":
             return "mdi:windsock"
@@ -401,7 +402,7 @@ class SecondsRemainSensorEntity(BaseSensorEntity):
     _attr_device_class = SensorDeviceClass.DURATION
     _attr_native_unit_of_measurement = UnitOfTime.SECONDS
     _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_native_value = 0
+    # _attr_native_value = 0
 
     def _update_value(self, val: Any) -> Any:
         ival = int(val)
@@ -444,7 +445,7 @@ class RemainingTimeSensorEntity(BaseSensorEntity):
     _attr_device_class = SensorDeviceClass.DURATION
     _attr_native_unit_of_measurement = UnitOfTime.MINUTES
     _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_native_value = 0
+    # _attr_native_value = 0
 
 
 class UsedTimeSensorEntity(BaseSensorEntity):
@@ -453,7 +454,7 @@ class UsedTimeSensorEntity(BaseSensorEntity):
     _attr_device_class = SensorDeviceClass.DURATION
     _attr_native_unit_of_measurement = UnitOfTime.MINUTES
     _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_native_value = 0
+    # _attr_native_value = 0
 
 
 class VoltSensorEntity(BaseSensorEntity):
@@ -463,7 +464,7 @@ class VoltSensorEntity(BaseSensorEntity):
     # _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_native_unit_of_measurement = UnitOfElectricPotential.VOLT
     _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_native_value = 0
+    # _attr_native_value = 0
 
     def _update_value(self, val: Any) -> bool:
         return super()._update_value(int(val) / 1000)
@@ -477,7 +478,7 @@ class MilliVoltSensorEntity(BaseSensorEntity):
     _attr_native_unit_of_measurement = UnitOfElectricPotential.MILLIVOLT
     # _attr_suggested_unit_of_measurement = UnitOfElectricPotential.VOLT
     _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_native_value = 0
+    # _attr_native_value = 0
 
 
 class InMilliVoltSensorEntity(MilliVoltSensorEntity):
@@ -501,7 +502,7 @@ class MilliAmpSensorEntity(BaseSensorEntity):
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_native_unit_of_measurement = UnitOfElectricCurrent.MILLIAMPERE
     _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_native_value = 0
+    # _attr_native_value = 0
 
 
 class AmpSensorEntity(BaseSensorEntity):
@@ -511,7 +512,7 @@ class AmpSensorEntity(BaseSensorEntity):
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_native_unit_of_measurement = UnitOfElectricCurrent.AMPERE
     _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_native_value = 0
+    # _attr_native_value = 0
 
     def _update_value(self, val: Any) -> bool:
         return super()._update_value(int(val) / 1000)
@@ -523,7 +524,7 @@ class WattsSensorEntity(BaseSensorEntity):
     _attr_device_class = SensorDeviceClass.POWER
     _attr_native_unit_of_measurement = UnitOfPower.WATT
     _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_native_value = 0
+    # _attr_native_value = 0
 
     def __init__(
         self,
@@ -562,7 +563,7 @@ class CapacitySensorEntity(BaseSensorEntity):
     _attr_state_class = SensorStateClass.MEASUREMENT
 
 
-class DeciwattsSensorEntity(WattsSensorEntity):
+class DeciwattSensorEntity(WattsSensorEntity):
     """Sensor for deciwatts."""
 
     def _update_value(self, val: Any) -> bool:
@@ -606,9 +607,9 @@ class LuxSensorEntity(BaseSensorEntity):
     _attr_device_class = SensorDeviceClass.ILLUMINANCE
     _attr_native_unit_of_measurement = LIGHT_LUX
     _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_native_value = 0
+    # _attr_native_value = 0
 
-    @property
+    @cached_property
     def icon(self) -> str:
         """Lux grade icon handling."""
 
@@ -640,7 +641,7 @@ class LuxGradeSensorEntity(BaseSensorEntity):
             return super()._update_value("very strong")
         return super()._update_value(val)
 
-    @property
+    @cached_property
     def icon(self) -> str:
         """Lux grade icon handling."""
 
@@ -704,7 +705,7 @@ class ProductInfoDetailsSensorEntity(BaseSensorEntity):
             _attr_device_class = SensorDeviceClass.POWER
             _attr_native_unit_of_measurement = UnitOfPower.WATT
             _attr_state_class = SensorStateClass.MEASUREMENT
-            _attr_native_value = 0
+            # _attr_native_value = 0
 
         super().__init__(dataHolder, device, mqtt_key, title, enabled, auto_enable)
         self._list_position = list_position
@@ -818,7 +819,7 @@ class StatusSensorEntity(BaseSensorEntity):
         self._attrs[ATTR_STATUS_UPDATES] = self._attrs[ATTR_STATUS_UPDATES] + 1
         self.schedule_update_ha_state()
 
-    @property
+    @cached_property
     def extra_state_attributes(self) -> Mapping[str, Any] | None:
         """Return the device-specific state attributes."""
         return self._attrs
