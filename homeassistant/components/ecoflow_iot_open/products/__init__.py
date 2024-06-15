@@ -24,7 +24,7 @@ class BaseDevice(ABC):
     def __init__(self, device_info: dict, api_interface) -> None:
         """Initialize."""
         self._api = api_interface
-        self._device_info = device_info
+        self._device_info: dict[str, Any] = device_info
         self._update_callback = None
         self._model: str
         # self.device_name: str
