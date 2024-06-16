@@ -160,41 +160,31 @@ class EcoFlowIoTOpenAPIInterface:
         await this_class._authenticate()
         return this_class
 
-    async def _get_devices(self) -> None:
-        """Retrieve device information from EcoFlow's API."""
-        headers = create_headers(self._accessKey, self._secretKey, None)
-        device_list = await self._request(
-            "GET", f"{self._base_url}/sign/device/list", headers=headers, timeout=30
-        )
-
-        if device_list.get("message") == "Success":
-            products: dict[ProductType, dict[str, Any]] = {}
-            tasks = [
-                self._process_device(device, products)
-                for device in device_list.get("data", [])
-            ]
-            await asyncio.gather(*tasks)
-            self._products = products
-
     async def _process_device(
-        self, device: dict[str, Any], products: dict[ProductType, dict[str, Any]]
+        self,
+        device: dict[str, Any],
+        filtered_products: dict[ProductType, dict[str, Any]],
+        product_types: list[ProductType],
     ) -> None:
-        """Process device information and adds it to products.
+        """Process device information and adds it to filtered_products if it matches the specified types.
 
         Args:
             device (dict[str, Any]): Device information dictionary.
-            products (dict[ProductType, dict[str, Any]]): Products dictionary.
+            filtered_products (dict[ProductType, dict[str, Any]]): Filtered products dictionary.
+            product_types (list[ProductType]): List of product types to filter.
 
         """
         device_quota = await self.getDeviceQuota(device["sn"])
         device.update(device_quota)
         sn_prefix = device["sn"][:4]
         product_type = self._get_product_type(sn_prefix)
-        if product_type:
-            if product_type not in products:
-                products[product_type] = {}
+        if product_type and product_type in product_types:
+            if product_type not in filtered_products:
+                filtered_products[product_type] = {}
             product_instance = self._create_product_instance(product_type, device)
-            products[product_type][product_instance.serial_number] = product_instance
+            filtered_products[product_type][product_instance.serial_number] = (
+                product_instance
+            )
 
     def _get_product_type(self, sn_prefix: str) -> Optional[ProductType]:
         """Determine the product type based on serial number prefix.
@@ -253,17 +243,20 @@ class EcoFlowIoTOpenAPIInterface:
             dict[ProductType, dict[str, Any]]: Dictionary of devices by product type.
 
         """
-        if not self._products:
-            await self._get_devices()
-        # _products: dict[ProductType, dict[str, BaseDevice]] = {}
-        filtered_products: dict[ProductType, dict[str, Any]] = {
-            pt: {} for pt in product_types
-        }
-        for devices in self._products.values():
-            for device in devices.values():
-                if device.type in product_types:
-                    filtered_products[device.type][device.serial_number] = device
-        return filtered_products
+        headers = create_headers(self._accessKey, self._secretKey, None)
+        device_list = await self._request(
+            "GET", f"{self._base_url}/sign/device/list", headers=headers, timeout=30
+        )
+
+        filtered_products: dict[ProductType, dict[str, Any]] = {}
+        if device_list.get("message") == "Success":
+            tasks = [
+                self._process_device(device, filtered_products, product_types)
+                for device in device_list.get("data", [])
+            ]
+            await asyncio.gather(*tasks)
+        self._products = filtered_products
+        return self._products
 
     async def _authenticate(self) -> None:
         """Authenticate the client with EcoFlow's API."""
