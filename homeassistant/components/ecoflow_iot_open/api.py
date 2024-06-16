@@ -49,11 +49,6 @@ from .products.powerstream import PowerStream
 from .products.single_axis_solar_tracker import SingleAxisSolarTracker
 from .products.smart_plug import SmartPlug
 
-# US: https://api-a.ecoflow.com
-# EU: https://api-e.ecoflow.com
-HOST = "api-e.ecoflow.com"
-HTTP_BASE_URL = f"https://{HOST}/iot-open"
-
 _LOGGER = logging.getLogger(__name__)
 _CLIENT_LOGGER = logging.getLogger(f"{__name__}.client")
 
@@ -108,6 +103,7 @@ class EcoFlowIoTOpenAPIInterface:
         self,
         accessKey: str,
         secretKey: str,
+        base_url: str,
         data_holder: Optional[EcoFlowIoTOpenDataHolder] = None,
     ) -> None:
         """Initialize an EcoFlowIoTOpenAPIInterface instance.
@@ -115,11 +111,23 @@ class EcoFlowIoTOpenAPIInterface:
         Args:
             accessKey (str): Access key for authentication.
             secretKey (str): Secret key for authentication.
-            data_holder (Optional[EcoFlowIoTOpenDataHolder]): Holder for EcoFlow IoT Open data.
+            base_url (str): Base URL for the API.
+            data_holder (Optional[EcoFlowIoTOpenDataHolder]): Holder for EcoFlow IoT Open data. Defaults to None.
+
+        Attributes:
+            _accessKey (str): Stores the provided access key.
+            _secretKey (str): Stores the provided secret key.
+            _base_url (str): Stores the provided base URL.
+            _certification (dict[str, Any]): Dictionary to hold certification data.
+            _products (dict[ProductType, dict[str, Any]]): Dictionary to hold products data.
+            _mqtt_client (Client): MQTT client for communication.
+            mqtt_listener (Optional[asyncio.Task]): Task for handling MQTT messages. Defaults to None.
+            _data_holder (Optional[EcoFlowIoTOpenDataHolder]): Holder for EcoFlow IoT Open data.
 
         """
         self._accessKey = accessKey
         self._secretKey = secretKey
+        self._base_url = base_url
         self._certification: dict[str, Any]
         # self._products: dict[ProductType, dict[str, BaseDevice]] = {}
         self._products: dict[ProductType, dict[str, Any]] = {}
@@ -132,21 +140,23 @@ class EcoFlowIoTOpenAPIInterface:
         cls: type[ApiType],
         accessKey: str,
         secretKey: str,
+        base_url: str,
         data_holder: Optional[EcoFlowIoTOpenDataHolder] = None,
     ) -> ApiType:
         """Class method for creating a certified EcoFlowIoTOpenAPIInterface instance.
 
         Args:
-            cls (type): Class object.
+            cls (type[ApiType]): Class object of type ApiType.
             accessKey (str): Access key for authentication.
             secretKey (str): Secret key for authentication.
-            data_holder (Optional[EcoFlowIoTOpenDataHolder]): Holder for EcoFlow IoT Open data.
+            base_url (str): Base URL for the API.
+            data_holder (Optional[EcoFlowIoTOpenDataHolder]): Holder for EcoFlow IoT Open data. Defaults to None.
 
         Returns:
-            type: Certified EcoFlowIoTOpenAPIInterface instance.
+            ApiType: Certified EcoFlowIoTOpenAPIInterface instance.
 
         """
-        this_class = cls(accessKey, secretKey, data_holder)
+        this_class = cls(accessKey, secretKey, base_url, data_holder)
         await this_class._authenticate()
         return this_class
 
@@ -154,7 +164,7 @@ class EcoFlowIoTOpenAPIInterface:
         """Retrieve device information from EcoFlow's API."""
         headers = create_headers(self._accessKey, self._secretKey, None)
         device_list = await self._request(
-            "GET", f"{HTTP_BASE_URL}/sign/device/list", headers=headers, timeout=30
+            "GET", f"{self._base_url}/sign/device/list", headers=headers, timeout=30
         )
 
         if device_list.get("message") == "Success":
@@ -257,9 +267,9 @@ class EcoFlowIoTOpenAPIInterface:
 
     async def _authenticate(self) -> None:
         """Authenticate the client with EcoFlow's API."""
-        headers = create_headers(self._accessKey, self._secretKey, None)
+        headers = create_headers(self._accessKey, self._secretKey)
         response = await self._request(
-            "GET", f"{HTTP_BASE_URL}/sign/certification", headers=headers, timeout=30
+            "GET", f"{self._base_url}/sign/certification", headers=headers, timeout=30
         )
         if response.get("message") == "Success":
             self._certification = response["data"]
@@ -375,7 +385,7 @@ class EcoFlowIoTOpenAPIInterface:
         headers = create_headers(self._accessKey, self._secretKey, params)
         response = await self._request(
             "GET",
-            f"{HTTP_BASE_URL}/sign/device/quota/all",
+            f"{self._base_url}/sign/device/quota/all",
             headers=headers,
             params=params,
         )

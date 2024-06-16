@@ -13,31 +13,51 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 
 from .api import EcoFlowIoTOpenAPIInterface
-from .const import CONF_ACCESS_KEY, CONF_SECRET_KEY, DOMAIN
+from .const import (
+    CONF_ACCESS_KEY,
+    CONF_BASE_URL,
+    CONF_SECRET_KEY,
+    CONF_SERVER_REGION,
+    DESCRIPTION_ACCESS_KEY,
+    DESCRIPTION_SECRET_KEY,
+    DESCRIPTION_SERVER_REGION,
+    DOMAIN,
+)
 from .errors import InvalidCredentialsError
 
 _LOGGER = logging.getLogger(__name__)
 
-# TODO adjust the data schema to the data that you need # pylint: disable=fixme
+SERVER_CHOICES = ["EU", "US"]
+DEFAULT_SERVER = "EU"
+
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
-        # vol.Required(CONF_HOST): str,
-        vol.Required(CONF_ACCESS_KEY): str,
-        vol.Required(CONF_SECRET_KEY): str,
+        vol.Required(CONF_ACCESS_KEY, description=DESCRIPTION_ACCESS_KEY): str,
+        vol.Required(CONF_SECRET_KEY, description=DESCRIPTION_SECRET_KEY): str,
+        vol.Required(
+            CONF_SERVER_REGION,
+            default=DEFAULT_SERVER,
+            description=DESCRIPTION_SERVER_REGION,
+        ): vol.In(SERVER_CHOICES),
     }
 )
 
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
-    """Validate the user input allows us to connect.
-
-    Data has the keys from STEP_USER_DATA_SCHEMA with values provided by the user.
-    """
+    """Validate the user input allows us to connect."""
     errors: dict[str, str] = {}
+
+    if data[CONF_SERVER_REGION] == "EU":
+        data[CONF_BASE_URL] = "https://api-e.ecoflow.com/iot-open"
+    elif data[CONF_SERVER_REGION] == "US":
+        data[CONF_BASE_URL] = "https://api-a.ecoflow.com/iot-open"
+    else:
+        errors[CONF_SERVER_REGION] = "invalid_server_region"
+        return errors
 
     try:
         await EcoFlowIoTOpenAPIInterface.certification(
-            data[CONF_ACCESS_KEY], data[CONF_SECRET_KEY], None
+            data[CONF_ACCESS_KEY], data[CONF_SECRET_KEY], data[CONF_BASE_URL], None
         )
 
     except ClientError:
@@ -46,8 +66,8 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     except InvalidCredentialsError:
         errors["base"] = "invalid_credentials"
     except Exception:  # pylint: disable=broad-except
-        _LOGGER.exception("Unexpected exception during login", stack_info=True)
-        errors["base"] = "unknown"
+        _LOGGER.exception("Unexpected exception", stack_info=True)
+        errors["base"] = "unhandled"
 
     if errors:
         return errors
@@ -60,7 +80,7 @@ class EcoFlowIoTOpenConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    # TODO Extend config flow by adittional step for selecting specific devices after device list has been received from API.
+    # TODO Extend config flow by adittional step for selecting specific devices after device list has been received from API. # pylint: disable=fixme
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None

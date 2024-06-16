@@ -10,7 +10,12 @@ DEVICES = "devices"
 
 
 CONF_ACCESS_KEY = "accessKey"
+DESCRIPTION_ACCESS_KEY = "Enter your access key. Your credentials need to be generated at https://developer.ecoflow.com/"
 CONF_SECRET_KEY = "secretKey"
+DESCRIPTION_SECRET_KEY = "Enter your secret key. Your credentials need to be generated at https://developer.ecoflow.com/"
+CONF_SERVER_REGION = "server region"
+CONF_BASE_URL = "base url"
+DESCRIPTION_SERVER_REGION = "Select the server region."
 
 DELTA_MAX = "DAEB"  # productType = 13
 # Potentially setup DELTA_MAX_SMART_EXTRA_BATTERY as separate device?
