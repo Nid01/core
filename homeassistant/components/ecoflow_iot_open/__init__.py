@@ -16,6 +16,7 @@ from .api import EcoFlowIoTOpenAPIInterface
 from .const import (
     API_CLIENT,
     CONF_ACCESS_KEY,
+    CONF_BASE_URL,
     CONF_SECRET_KEY,
     DATA_HOLDER,
     DOMAIN,
@@ -47,13 +48,13 @@ INTERVAL = timedelta(minutes=60)
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
     """Set up EcoFlow IoT Open from a config entry."""
 
-    accessKey = config_entry.data[CONF_ACCESS_KEY]
-    secretKey = config_entry.data[CONF_SECRET_KEY]
-
     try:
         data_holder = EcoFlowIoTOpenDataHolder()
         api = await EcoFlowIoTOpenAPIInterface.certification(
-            accessKey, secretKey, data_holder
+            config_entry.data[CONF_ACCESS_KEY],
+            config_entry.data[CONF_SECRET_KEY],
+            config_entry.data[CONF_BASE_URL],
+            data_holder,
         )
     except (InvalidCredentialsError, KeyError):
         _LOGGER.error("Invalid credentials provided")
@@ -65,8 +66,8 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         products = await api.get_devices_by_product(
             [
                 # ProductType.DELTA_MAX,
-                # ProductType.POWERSTREAM,
-                ProductType.SINGLE_AXIS_SOLAR_TRACKER,
+                ProductType.POWERSTREAM,
+                # ProductType.SINGLE_AXIS_SOLAR_TRACKER,
                 # ProductType.SMART_PLUG,
             ]
         )
