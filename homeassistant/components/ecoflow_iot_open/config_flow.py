@@ -8,9 +8,9 @@ from typing import Any
 from aiohttp import ClientError
 import voluptuous as vol
 
+from homeassistant.auth import InvalidAuthError
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
 
 from .api import EcoFlowIoTOpenAPIInterface
 from .const import (
@@ -23,7 +23,7 @@ from .const import (
     DESCRIPTION_SERVER_REGION,
     DOMAIN,
 )
-from .errors import InvalidCredentialsError
+from .errors import CannotConnect, InvalidCredentialsError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -93,7 +93,7 @@ class EcoFlowIoTOpenConfigFlow(ConfigFlow, domain=DOMAIN):
                 info = await validate_input(self.hass, user_input)
             except CannotConnect:
                 errors["base"] = "cannot_connect"
-            except InvalidAuth:
+            except InvalidAuthError:
                 errors["base"] = "invalid_auth"
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.exception("Unexpected exception")
@@ -104,11 +104,3 @@ class EcoFlowIoTOpenConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
         )
-
-
-class CannotConnect(HomeAssistantError):
-    """Error to indicate we cannot connect."""
-
-
-class InvalidAuth(HomeAssistantError):
-    """Error to indicate there is invalid auth."""

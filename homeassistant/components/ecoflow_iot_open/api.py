@@ -382,7 +382,10 @@ class EcoFlowIoTOpenAPIInterface:
             headers=headers,
             params=params,
         )
-        if response.get("message") == "Success" and serial_number[:4] == POWERSTREAM:
+        if response.get("message") == "Success" and serial_number[:4] in (
+            POWERSTREAM,
+            SMART_PLUG,
+        ):
             response["data"] = {
                 f"iot.{key.split('.', 2)[-1]}": value
                 for key, value in response["data"].items()

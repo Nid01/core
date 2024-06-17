@@ -3,28 +3,23 @@
 from collections.abc import Sequence
 
 from homeassistant.components.sensor import SensorEntity
+from homeassistant.const import UnitOfElectricCurrent, UnitOfTime
 
 from ..api import EcoFlowIoTOpenDataHolder
 from ..sensor import (
-    CapacitySensorEntity,
+    BatterySensorEntity,
+    BrightnessSensorEntity,
+    CurrentSensorEntity,
     CyclesSensorEntity,
-    InMilliVoltSensorEntity,
-    InWattsSensorEntity,
-    InWattsSolarSensorEntity,
-    LevelSensorEntity,
-    MilliAmpSensorEntity,
-    MilliVoltSensorEntity,
-    MiscSensorEntity,
-    OutMilliVoltSensorEntity,
-    OutWattsDcSensorEntity,
-    OutWattsSensorEntity,
-    ProductInfoDetailsSensorEntity,
-    RemainingTimeSensorEntity,
+    DiagnosticSensorEntity,
+    DurationSensorEntity,
+    EnergySensorEntity,
+    EnergyStorageSensorEntity,
+    PowerSensorEntity,
+    ProductInfoDetailSensorEntity,
     StatusSensorEntity,
-    TempSensorEntity,
-    UsedTimeSensorEntity,
-    VoltSensorEntity,
-    WattsSensorEntity,
+    TemperateSensorEntity,
+    VoltageSensorEntity,
 )
 from . import BaseDevice
 
@@ -40,334 +35,411 @@ class DELTAMax(BaseDevice):
 
     def sensors(self, dataHolder: EcoFlowIoTOpenDataHolder) -> Sequence[SensorEntity]:
         """Available sensors for DELTA Max."""
-        return [
-            # bmsMaster
-            MilliAmpSensorEntity(dataHolder, self, "bmsMaster.amp"),
-            MiscSensorEntity(dataHolder, self, "bmsMaster.balanceState"),
-            MiscSensorEntity(dataHolder, self, "bmsMaster.bmsFault"),
-            MiscSensorEntity(dataHolder, self, "bmsMaster.bqSysStatReg"),
-            MiscSensorEntity(dataHolder, self, "bmsMaster.cellId"),
-            MiscSensorEntity(dataHolder, self, "bmsMaster.cellNtcNum"),
-            MiscSensorEntity(dataHolder, self, "bmsMaster.cellSeriesNum"),
-            # cellTemp needs to be processed as list
-            MiscSensorEntity(dataHolder, self, "bmsMaster.cellTemp"),
-            MiscSensorEntity(dataHolder, self, "bmsMaster.cellVol"),
-            CyclesSensorEntity(dataHolder, self, "bmsMaster.cycles"),
-            CapacitySensorEntity(dataHolder, self, "bmsMaster.designCap"),
-            MiscSensorEntity(dataHolder, self, "bmsMaster.errCode"),
-            LevelSensorEntity(dataHolder, self, "bmsMaster.f32ShowSoc"),
-            CapacitySensorEntity(dataHolder, self, "bmsMaster.fullCap"),
-            MiscSensorEntity(dataHolder, self, "bmsMaster.hwEdition"),
-            WattsSensorEntity(dataHolder, self, "bmsMaster.inputWatts"),
-            TempSensorEntity(dataHolder, self, "bmsMaster.maxMosTemp"),
-            MilliVoltSensorEntity(dataHolder, self, "bmsMaster.maxVolDiff"),
-            TempSensorEntity(dataHolder, self, "bmsMaster.maxCellTemp"),
-            MiscSensorEntity(dataHolder, self, "bmsMaster.maxCellVol"),
-            TempSensorEntity(dataHolder, self, "bmsMaster.minCellTemp"),
-            MiscSensorEntity(dataHolder, self, "bmsMaster.minCellVol"),
-            TempSensorEntity(dataHolder, self, "bmsMaster.minMosTemp"),
-            MiscSensorEntity(dataHolder, self, "bmsMaster.mosState"),
-            MiscSensorEntity(dataHolder, self, "bmsMaster.num"),
-            MiscSensorEntity(dataHolder, self, "bmsMaster.openBmsIdx"),
-            WattsSensorEntity(dataHolder, self, "bmsMaster.outputWatts"),
-            CapacitySensorEntity(dataHolder, self, "bmsMaster.remainCap"),
-            RemainingTimeSensorEntity(dataHolder, self, "bmsMaster.remainTime"),
-            LevelSensorEntity(dataHolder, self, "bmsMaster.soc")
-            .attr("bmsMaster.designCap", default=0)
-            .attr("bmsMaster.fullCap", default=0)
-            .attr("bmsMaster.remainCap", default=0),
-            MiscSensorEntity(dataHolder, self, "bmsMaster.soh"),
-            MiscSensorEntity(dataHolder, self, "bmsMaster.sysVer"),
-            MilliAmpSensorEntity(dataHolder, self, "bmsMaster.tagChgAmp"),
-            TempSensorEntity(dataHolder, self, "bmsMaster.temp")
-            .attr("bmsMaster.minCellTemp", default=0)
-            .attr("bmsMaster.maxCellTemp", default=0),
-            MiscSensorEntity(dataHolder, self, "bmsMaster.type"),
-            MilliVoltSensorEntity(dataHolder, self, "bmsMaster.vol")
-            .attr("bmsMaster.minCellVol", default=0)
-            .attr("bmsMaster.maxCellVol", default=0),
-            # bmsSlave1, in this case DELTA Max Smart Battery
-            MilliAmpSensorEntity(dataHolder, self, "bmsSlave1.amp"),
-            MiscSensorEntity(dataHolder, self, "bmsSlave1.balanceState"),
-            MiscSensorEntity(dataHolder, self, "bmsSlave1.bmsFault"),
-            MiscSensorEntity(dataHolder, self, "bmsSlave1.bqSysStatReg"),
-            MiscSensorEntity(dataHolder, self, "bmsSlave1.cellId"),
-            MiscSensorEntity(dataHolder, self, "bmsSlave1.cellNtcNum"),
-            MiscSensorEntity(dataHolder, self, "bmsSlave1.cellSeriesNum"),
-            # cellTemp needs to be processed as list
-            MiscSensorEntity(dataHolder, self, "bmsSlave1.cellTemp"),
-            MiscSensorEntity(dataHolder, self, "bmsSlave1.cellVol"),
-            CyclesSensorEntity(dataHolder, self, "bmsSlave1.cycles"),
-            MiscSensorEntity(dataHolder, self, "bmsSlave1.errCode"),
-            LevelSensorEntity(
-                dataHolder, self, "bmsSlave1.f32ShowSoc", auto_enable=True
+
+        device_info_keys = set(self._device_info.keys())
+        device_info_keys.remove("deviceName")
+        device_info_keys.remove("online")
+        device_info_keys.remove("sn")
+
+        def add_cell_sensors(cell_key, sensors: list, SensorEntityClass):
+            if cell_key in device_info_keys:
+                cell_keys = [
+                    (cell_key, index)
+                    for index in range(len(self._device_info[cell_key]))
+                ]
+                cell_sensors = [
+                    SensorEntityClass(dataHolder, self, key[0], list_position=key[1])
+                    for key in cell_keys
+                ]
+                sensors.extend(cell_sensors)
+
+        battery_keys = [
+            "bmsMaster.f32ShowSoc",
+            # .attr("bmsMaster.designCap", default=0)
+            # .attr("bmsMaster.fullCap", default=0)
+            # .attr("bmsMaster.remainCap", default=0),
+            # .attr("bmsMaster.cycles", default=0),
+            "bmsMaster.soc",
+            "bmsSlave1.f32ShowSoc",
+            # .attr("bmsSlave1.designCap", default=0)
+            # .attr("bmsSlave1.fullCap", default=0)
+            # .attr("bmsSlave1.remainCap", default=0)
+            # .attr("bmsSlave1.cycles", default=0),
+            "bmsSlave1.soc",
+            "ems.f32LcdShowSoc",
+            "ems.lcdShowSoc",
+            "pd.soc",
+            # ("kit.productInfoDetails", 0, "f32Soc"),
+            # ("kit.productInfoDetails", 0, "soc"),
+            # ("kit.productInfoDetails", 1, "f32Soc"),
+            # ("kit.productInfoDetails", 1, "soc"),
+        ]
+
+        battery_sensors = [
+            BatterySensorEntity(dataHolder, self, key)
+            for key in battery_keys
+            if key in device_info_keys
+        ]
+
+        brightness_keys = [
+            "pd.lcdBrightness",
+        ]
+
+        brightness_sensors = [
+            BrightnessSensorEntity(dataHolder, self, key)
+            for key in brightness_keys
+            if key in device_info_keys
+        ]
+
+        current_keys = [
+            "bmsMaster.amp",
+            "bmsMaster.tagChgAmp",
+            "bmsSlave1.amp",
+            "bmsSlave1.tagChgAmp",
+            "ems.chgAmp",
+            "inv.acInAmp",
+            "inv.dcInAmp",
+            "inv.invOutAmp",
+            "mppt.carOutAmp",
+            "mppt.cfgDcChgCurrent",
+            "mppt.dcdc12vAmp",
+            "mppt.inAmp",
+            "mppt.outAmp",
+        ]
+
+        current_units = {
+            "mppt.carOutAmp": UnitOfElectricCurrent.MILLIAMPERE,
+        }
+
+        current_sensors = [
+            CurrentSensorEntity(
+                dataHolder,
+                self,
+                key,
+                current_units.get(key, UnitOfElectricCurrent.AMPERE),
             )
-            .attr("bmsSlave1.designCap", default=0)
-            .attr("bmsSlave1.fullCap", default=0)
-            .attr("bmsSlave1.remainCap", default=0)
-            .attr("bmsSlave1.cycles", default=0),
-            CapacitySensorEntity(dataHolder, self, "bmsSlave1.fullCap"),
-            MiscSensorEntity(dataHolder, self, "bmsSlave1.hwEdition"),
-            InWattsSensorEntity(dataHolder, self, "bmsSlave1.inputWatts"),
-            TempSensorEntity(dataHolder, self, "bmsSlave1.maxCellTemp"),
-            MiscSensorEntity(dataHolder, self, "bmsSlave1.maxCellVol"),
-            MiscSensorEntity(dataHolder, self, "bmsSlave1.maxMosTemp"),
-            MilliVoltSensorEntity(dataHolder, self, "bmsSlave1.maxVolDiff"),
-            TempSensorEntity(dataHolder, self, "bmsSlave1.minCellTemp"),
-            MiscSensorEntity(dataHolder, self, "bmsSlave1.minCellVol"),
-            TempSensorEntity(dataHolder, self, "bmsSlave1.minMosTemp"),
-            MiscSensorEntity(dataHolder, self, "bmsSlave1.mosState"),
-            MiscSensorEntity(dataHolder, self, "bmsSlave1.num"),
-            MiscSensorEntity(dataHolder, self, "bmsSlave1.openBmsIdx"),
-            OutWattsSensorEntity(dataHolder, self, "bmsSlave1.outputWatts"),
-            CapacitySensorEntity(dataHolder, self, "bmsSlave1.remainCap"),
-            RemainingTimeSensorEntity(dataHolder, self, "bmsSlave1.remainTime"),
-            MiscSensorEntity(dataHolder, self, "bmsSlave1.soc"),
-            MiscSensorEntity(dataHolder, self, "bmsSlave1.soh"),
-            MiscSensorEntity(dataHolder, self, "bmsSlave1.sysVer"),
-            MilliAmpSensorEntity(dataHolder, self, "bmsSlave1.tagChgAmp"),
-            TempSensorEntity(dataHolder, self, "bmsSlave1.temp", auto_enable=True),
-            MiscSensorEntity(dataHolder, self, "bmsSlave1.type"),
-            VoltSensorEntity(dataHolder, self, "bmsSlave1.vol"),
-            # ems
-            MiscSensorEntity(dataHolder, self, "ems.bms0Online"),
-            MiscSensorEntity(dataHolder, self, "ems.bms1Online"),
-            MiscSensorEntity(dataHolder, self, "ems.bms2Online"),
-            MiscSensorEntity(dataHolder, self, "ems.bmsModel"),
-            MiscSensorEntity(dataHolder, self, "ems.bmsWarningState"),
-            MilliAmpSensorEntity(dataHolder, self, "ems.chgAmp"),
-            RemainingTimeSensorEntity(dataHolder, self, "ems.chgRemainTime"),
-            MiscSensorEntity(dataHolder, self, "ems.chgCmd"),
-            MiscSensorEntity(dataHolder, self, "ems.chgState"),
-            MilliVoltSensorEntity(dataHolder, self, "ems.chgVol"),
-            MiscSensorEntity(dataHolder, self, "ems.dsgCmd"),
-            RemainingTimeSensorEntity(dataHolder, self, "ems.dsgRemainTime"),
-            MiscSensorEntity(dataHolder, self, "ems.emsIsNormalFlag"),
-            LevelSensorEntity(dataHolder, self, "ems.f32LcdShowSoc"),
-            MiscSensorEntity(dataHolder, self, "ems.fanLevel"),
-            LevelSensorEntity(dataHolder, self, "ems.lcdShowSoc"),
-            MiscSensorEntity(dataHolder, self, "ems.maxAvailableNum"),
-            MiscSensorEntity(dataHolder, self, "ems.maxChargeSoc"),
-            MiscSensorEntity(dataHolder, self, "ems.maxCloseOilEbSoc"),
-            MiscSensorEntity(dataHolder, self, "ems.minDsgSoc"),
-            MiscSensorEntity(dataHolder, self, "ems.minOpenOilEbSoc"),
-            MiscSensorEntity(dataHolder, self, "ems.openBmsIdx"),
-            MiscSensorEntity(dataHolder, self, "ems.openUpsFlag"),
-            MilliVoltSensorEntity(dataHolder, self, "ems.paraVolMax"),
-            MilliVoltSensorEntity(dataHolder, self, "ems.paraVolMin"),
-            # inv
-            MiscSensorEntity(dataHolder, self, "inv.acDipSwitch"),
-            MilliAmpSensorEntity(dataHolder, self, "inv.acInAmp"),
-            MiscSensorEntity(dataHolder, self, "inv.acInFreq"),
-            InMilliVoltSensorEntity(dataHolder, self, "inv.acInVol"),
-            MiscSensorEntity(dataHolder, self, "inv.acPassByAutoEn"),
-            MiscSensorEntity(dataHolder, self, "inv.cfgAcEnabled"),
-            MiscSensorEntity(dataHolder, self, "inv.cfgAcOutFreq"),
-            MilliVoltSensorEntity(dataHolder, self, "inv.cfgAcOutVoltage"),
-            MiscSensorEntity(dataHolder, self, "inv.cfgAcWorkMode"),
-            MiscSensorEntity(dataHolder, self, "inv.cfgAcXboost"),
-            MiscSensorEntity(dataHolder, self, "inv.cfgFastChgWatts"),
-            MiscSensorEntity(dataHolder, self, "inv.cfgSlowChgWatts"),
-            MiscSensorEntity(dataHolder, self, "inv.cfgStandbyMin"),
-            MiscSensorEntity(dataHolder, self, "inv.chargerType"),
-            MiscSensorEntity(dataHolder, self, "inv.chgPauseFlag"),
-            MilliAmpSensorEntity(dataHolder, self, "inv.dcInAmp"),
-            TempSensorEntity(dataHolder, self, "inv.dcInTemp"),
-            MilliVoltSensorEntity(dataHolder, self, "inv.dcInVol"),
-            MiscSensorEntity(dataHolder, self, "inv.dischargeType"),
-            MiscSensorEntity(dataHolder, self, "inv.errCode"),
-            MiscSensorEntity(dataHolder, self, "inv.fanState"),
-            InWattsSensorEntity(dataHolder, self, "inv.inputWatts"),
-            MilliAmpSensorEntity(dataHolder, self, "inv.invOutAmp"),
-            MiscSensorEntity(dataHolder, self, "inv.invOutFreq"),
-            MiscSensorEntity(dataHolder, self, "inv.invType"),
-            OutMilliVoltSensorEntity(dataHolder, self, "inv.invOutVol"),
-            OutWattsSensorEntity(dataHolder, self, "inv.outputWatts"),
-            TempSensorEntity(dataHolder, self, "inv.outTemp"),
-            MiscSensorEntity(dataHolder, self, "inv.sysVer"),
-            # kit
-            MiscSensorEntity(dataHolder, self, "kit.availableDataLen"),
-            MiscSensorEntity(dataHolder, self, "kit.maxKitNum"),
-            # DELTA Max port 0, in this case DELTA Max Smart Battery
-            ProductInfoDetailsSensorEntity(
-                dataHolder, self, "kit.productInfoDetails", 0, "appVersion"
-            ),
-            WattsSensorEntity(
-                dataHolder, self, "kit.productInfoDetails", 0, "curPower"
-            ),
-            LevelSensorEntity(dataHolder, self, "kit.productInfoDetails", 0, "f32Soc"),
-            ProductInfoDetailsSensorEntity(
-                dataHolder, self, "kit.productInfoDetails", 0, "loaderVersion"
-            ),
-            ProductInfoDetailsSensorEntity(
-                dataHolder, self, "kit.productInfoDetails", 0, "procedureState"
-            ),
-            ProductInfoDetailsSensorEntity(
-                dataHolder, self, "kit.productInfoDetails", 0, "productDetail"
-            ),
-            ProductInfoDetailsSensorEntity(
-                dataHolder, self, "kit.productInfoDetails", 0, "productType"
-            ),
-            ProductInfoDetailsSensorEntity(
-                dataHolder, self, "kit.productInfoDetails", 0, "protocolAvaiFlag"
-            ),
-            ProductInfoDetailsSensorEntity(
-                dataHolder, self, "kit.productInfoDetails", 0, "sn"
-            ),
-            LevelSensorEntity(dataHolder, self, "kit.productInfoDetails", 0, "soc"),
-            # DELTA Max port 1, in this case PowerStream
-            ProductInfoDetailsSensorEntity(
-                dataHolder, self, "kit.productInfoDetails", 1, "appVersion"
-            ),
-            WattsSensorEntity(
-                dataHolder, self, "kit.productInfoDetails", 1, "curPower"
-            ),
-            LevelSensorEntity(dataHolder, self, "kit.productInfoDetails", 1, "f32Soc"),
-            ProductInfoDetailsSensorEntity(
-                dataHolder, self, "kit.productInfoDetails", 1, "loaderVersion"
-            ),
-            ProductInfoDetailsSensorEntity(
-                dataHolder, self, "kit.productInfoDetails", 1, "procedureState"
-            ),
-            ProductInfoDetailsSensorEntity(
-                dataHolder, self, "kit.productInfoDetails", 1, "productDetail"
-            ),
-            ProductInfoDetailsSensorEntity(
-                dataHolder, self, "kit.productInfoDetails", 1, "productType"
-            ),
-            ProductInfoDetailsSensorEntity(
-                dataHolder, self, "kit.productInfoDetails", 1, "protocolAvaiFlag"
-            ),
-            ProductInfoDetailsSensorEntity(
-                dataHolder, self, "kit.productInfoDetails", 1, "sn"
-            ),
-            LevelSensorEntity(dataHolder, self, "kit.productInfoDetails", 1, "soc"),
-            MiscSensorEntity(dataHolder, self, "kit.protocolVersion"),
-            # mppt
-            MilliAmpSensorEntity(dataHolder, self, "mppt.carOutAmp"),
-            MilliVoltSensorEntity(dataHolder, self, "mppt.carOutVol"),
-            WattsSensorEntity(dataHolder, self, "mppt.carOutWatts"),
-            MiscSensorEntity(dataHolder, self, "mppt.carState"),
-            TempSensorEntity(dataHolder, self, "mppt.carTemp"),
-            MiscSensorEntity(dataHolder, self, "mppt.cfgChgType"),
-            MiscSensorEntity(dataHolder, self, "mppt.cfgDcChgCurrent"),
-            MiscSensorEntity(dataHolder, self, "mppt.chgPauseFlag"),
-            MiscSensorEntity(dataHolder, self, "mppt.chgState"),
-            MiscSensorEntity(dataHolder, self, "mppt.chgType"),
-            MiscSensorEntity(dataHolder, self, "mppt.dc24vState"),
-            TempSensorEntity(dataHolder, self, "mppt.dc24vTemp"),
-            MilliAmpSensorEntity(dataHolder, self, "mppt.dcdc12vAmp"),
-            MilliVoltSensorEntity(dataHolder, self, "mppt.dcdc12vVol"),
-            WattsSensorEntity(dataHolder, self, "mppt.dcdc12vWatts"),
-            MiscSensorEntity(dataHolder, self, "mppt.faultCode"),
-            MilliAmpSensorEntity(dataHolder, self, "mppt.inAmp"),
-            MilliVoltSensorEntity(dataHolder, self, "mppt.inVol"),
-            InWattsSolarSensorEntity(dataHolder, self, "mppt.inWatts"),
-            TempSensorEntity(dataHolder, self, "mppt.mpptTemp"),
-            MilliAmpSensorEntity(dataHolder, self, "mppt.outAmp"),
-            MilliVoltSensorEntity(dataHolder, self, "mppt.outVol"),
-            OutWattsDcSensorEntity(dataHolder, self, "mppt.outWatts"),
-            MiscSensorEntity(dataHolder, self, "mppt.swVer"),
-            MiscSensorEntity(dataHolder, self, "mppt.xt60ChgType"),
-            # pd
-            MiscSensorEntity(dataHolder, self, "pd.beepState"),
-            MiscSensorEntity(dataHolder, self, "pd.carState"),
-            TempSensorEntity(dataHolder, self, "pd.carTemp"),
-            UsedTimeSensorEntity(dataHolder, self, "pd.carUsedTime"),
-            WattsSensorEntity(dataHolder, self, "pd.carWatts"),
-            MiscSensorEntity(dataHolder, self, "pd.chgPowerAc"),
-            MiscSensorEntity(dataHolder, self, "pd.chgPowerDc"),
-            MiscSensorEntity(dataHolder, self, "pd.chgSunPower"),
-            UsedTimeSensorEntity(dataHolder, self, "pd.dcInUsedTime"),
-            MiscSensorEntity(dataHolder, self, "pd.dcOutState"),
-            MiscSensorEntity(dataHolder, self, "pd.dsgPowerAc"),
-            MiscSensorEntity(dataHolder, self, "pd.dsgPowerDc"),
-            MiscSensorEntity(dataHolder, self, "pd.errCode"),
+            for key in current_keys
+            if key in device_info_keys
+        ]
+
+        cycles_keys = [
+            "bmsMaster.cycles",
+            "bmsSlave1.cycles",
+        ]
+
+        cycles_sensors = [
+            CyclesSensorEntity(dataHolder, self, key)
+            for key in cycles_keys
+            if key in device_info_keys
+        ]
+
+        energy_keys = [
+            "pd.chgPowerAc",
+            "pd.chgPowerDc",
+            "pd.chgSunPower",
+            "pd.dsgPowerAc",
+            "pd.dsgPowerDc",
+        ]
+
+        energy_sensors = [
+            EnergySensorEntity(dataHolder, self, key)
+            for key in energy_keys
+            if key in device_info_keys
+        ]
+
+        energy_storage_keys = [
+            "bmsMaster.designCap",
+            "bmsMaster.fullCap",
+            "bmsMaster.remainCap",
+            "bmsSlave1.designCap",
+            "bmsSlave1.fullCap",
+            "bmsSlave1.remainCap",
+        ]
+
+        energy_storage_sensors = [
+            EnergyStorageSensorEntity(dataHolder, self, key)
+            for key in energy_storage_keys
+            if key in device_info_keys
+        ]
+
+        duration_keys = [
+            "bmsMaster.remainTime",
+            "bmsSlave1.remainTime",
+            "ems.chgRemainTime",
+            "ems.dsgRemainTime",
+            "inv.cfgStandbyMin",
+            "pd.carUsedTime",
+            "pd.dcInUsedTime",
+            "pd.invUsedTime",
+            "pd.lcdOffSec",
+            "pd.mpptUsedTime",
+            "pd.remainTime",
+            "pd.typccUsedTime",
+            "pd.usbqcUsedTime",
+            "pd.usbUsedTime",
+            "pd.standByMode",
+        ]
+
+        duration_units = {
+            "pd.lcdOffSec": UnitOfTime.SECONDS,
+        }
+
+        duration_sensors = [
+            DurationSensorEntity(
+                dataHolder,
+                self,
+                key,
+                duration_units.get(key, UnitOfTime.MINUTES),
+            )
+            for key in duration_keys
+            if key in device_info_keys
+        ]
+
+        power_keys = [
+            "bmsMaster.inputWatts",
+            "bmsMaster.outputWatts",
+            "bmsSlave1.inputWatts",
+            "bmsSlave1.outputWatts",
+            "inv.cfgFastChgWatts",
+            "inv.cfgSlowChgWatts",
+            "inv.inputWatts",
+            "inv.outputWatts",
+            # ("kit.productInfoDetails", 0, "curPower"),
+            # ("kit.productInfoDetails", 1, "curPower"),
+            "mppt.carOutWatts",
+            "mppt.dcdc12vWatts",
+            "mppt.inWatts",
+            "mppt.outWatts",
+            "pd.carWatts",
+            "pd.qcUsb1Watts",
+            "pd.qcUsb2Watts",
+            "pd.typec1Watts",
+            "pd.typec2Watts",
+            "pd.usb1Watts",
+            "pd.usb2Watts",
+            "pd.wirelessWatts",
+            "pd.wattsInSum",
+            "pd.wattsOutSum",
+        ]
+
+        power_factors = {
+            "mppt.inWatts": 0.1,
+            "mppt.outWatts": 0.1,
+        }
+
+        power_sensors = [
+            PowerSensorEntity(
+                dataHolder,
+                self,
+                key,
+                power_factors.get(key, 1),
+            )
+            for key in power_keys
+            if key in device_info_keys
+        ]
+
+        temperature_keys = [
+            "bmsMaster.maxCellTemp",
+            "bmsMaster.maxMosTemp",
+            "bmsMaster.minCellTemp",
+            "bmsMaster.minMosTemp",
+            "bmsMaster.temp",
+            # .attr("bmsMaster.minCellTemp", default=0)
+            # .attr("bmsMaster.maxCellTemp", default=0),
+            "bmsSlave1.maxCellTemp",
+            "bmsSlave1.maxMosTemp",
+            "bmsSlave1.minCellTemp",
+            "bmsSlave1.minMosTemp",
+            "bmsSlave1.temp",
+            # .attr("bmsSlave1.minCellTemp", default=0)
+            # .attr("bmsSlave1.maxCellTemp", default=0),
+            "inv.dcInTemp",
+            "inv.outTemp",
+            "mppt.carTemp",
+            "mppt.dc24vTemp",
+            "mppt.mpptTemp",
+            "pd.carTemp",
+            "pd.typec1Temp",
+            "pd.typec2Temp",
+        ]
+
+        temperature_sensors = [
+            TemperateSensorEntity(dataHolder, self, key)
+            for key in temperature_keys
+            if key in device_info_keys
+        ]
+
+        add_cell_sensors(
+            "bmsMaster.cellTemp", temperature_sensors, TemperateSensorEntity
+        )
+        add_cell_sensors(
+            "bmsSlave1.cellTemp", temperature_sensors, TemperateSensorEntity
+        )
+
+        voltage_keys = [
+            "bmsMaster.vol",
+            # .attr("bmsMaster.minCellVol", default=0)
+            # .attr("bmsMaster.maxCellVol", default=0),
+            "bmsMaster.maxCellVol",
+            "bmsMaster.minCellVol",
+            "bmsMaster.maxVolDiff",
+            "bmsSlave1.vol",
+            # .attr("bmsSlave1.minCellVol", default=0)
+            # .attr("bmsSlave1.maxCellVol", default=0),
+            "bmsSlave1.maxCellVol",
+            "bmsSlave1.minCellVol",
+            "bmsSlave1.maxVolDiff",
+            "ems.chgVol",
+            "ems.paraVolMax",
+            "ems.paraVolMin",
+            "inv.acInVol",
+            "inv.cfgAcOutVoltage",
+            "inv.dcInVol",
+            "inv.invOutVol",
+            "mppt.carOutVol",
+            "mppt.dcdc12vVol",
+            "mppt.inVol",
+            "mppt.outVol",
+        ]
+
+        voltage_sensors = [
+            VoltageSensorEntity(dataHolder, self, key)
+            for key in voltage_keys
+            if key in device_info_keys
+        ]
+
+        add_cell_sensors("bmsMaster.cellVol", voltage_sensors, VoltageSensorEntity)
+        add_cell_sensors("bmsSlave1.cellVol", voltage_sensors, VoltageSensorEntity)
+
+        product_info_detail_keys = []
+        product_info_detail_sensors = []
+
+        product_info_details_key = "kit.productInfoDetails"
+        if product_info_details_key in device_info_keys:
+            # Define the detail keys
+            detail_keys = [
+                "appVersion",
+                "loaderVersion",
+                "procedureState",
+                "productDetail",
+                "productType",
+                "protocolAvaiFlag",
+                "sn",
+            ]
+            product_info_detail_keys = [
+                (product_info_details_key, index, detail_key)
+                for index in range(len(self._device_info[product_info_details_key]))
+                for detail_key in detail_keys
+            ]
+            product_info_detail_sensors = [
+                ProductInfoDetailSensorEntity(dataHolder, self, key[0], key[1], key[2])
+                for key in product_info_detail_keys
+            ]
+
+        ignored_keys = [
+            "bmsMaster.cellTemp",
+            "bmsSlave1.cellTemp",
+            "bmsMaster.cellVol",
+            "bmsSlave1.cellVol",
             # icons
-            # MiscSensorEntity(dataHolder, self, "pd.iconAcFreqMode"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconAcFreqState"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconBmsErrMode"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconBmsErrState"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconBmsParallelMode"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconBmsParallelState"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconBtMode"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconBtState"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconCarMode"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconCarState"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconChgStationMode"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconChgStationState"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconCoGasMode"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconCoGasState"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconEcoMode"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconEcoState"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconFactoryMode"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconFactoryState"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconFanMode"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconFanState"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconGasGenMode"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconGasGenState"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconHiTempMode"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconHiTempState"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconInvParallelMode"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconInvParallelState"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconLowTempMode"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconLowTempState"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconOverloadMode"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconOverloadState"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconPackHeaterMode"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconPackHeaterState"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconRcMode"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconRcState"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconRechgTimeMode"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconRechgTimeState"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconSocUpsMode"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconSocUpsState"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconSolarBracketMode"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconSolarBracketState"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconSolarPanelMode"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconSolarPanelState"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconTransSwMode"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconTransSwState"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconTypecMode"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconTypecState"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconUsbMode"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconUsbState"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconWifiMode"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconWifiState"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconWindGenMode"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconWindGenState"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconWirelessChgMode"),
-            # MiscSensorEntity(dataHolder, self, "pd.iconWirelessChgState"),
-            UsedTimeSensorEntity(dataHolder, self, "pd.invUsedTime"),
-            MiscSensorEntity(dataHolder, self, "pd.kit0"),
-            MiscSensorEntity(dataHolder, self, "pd.kit1"),
-            MiscSensorEntity(dataHolder, self, "pd.kit2"),
-            MiscSensorEntity(dataHolder, self, "pd.lcdBrightness"),
-            MiscSensorEntity(dataHolder, self, "pd.lcdOffSec"),
-            MiscSensorEntity(dataHolder, self, "pd.model"),
-            UsedTimeSensorEntity(dataHolder, self, "pd.mpptUsedTime"),
-            RemainingTimeSensorEntity(dataHolder, self, "pd.remainTime"),
-            WattsSensorEntity(dataHolder, self, "pd.qcUsb1Watts"),
-            WattsSensorEntity(dataHolder, self, "pd.qcUsb2Watts"),
-            MiscSensorEntity(dataHolder, self, "pd.soc"),
-            MiscSensorEntity(dataHolder, self, "pd.standByMode"),
-            MiscSensorEntity(dataHolder, self, "pd.sysChgDsgState"),
-            MiscSensorEntity(dataHolder, self, "pd.sysVer"),
-            TempSensorEntity(dataHolder, self, "pd.typec1Temp"),
-            WattsSensorEntity(dataHolder, self, "pd.typec1Watts"),
-            TempSensorEntity(dataHolder, self, "pd.typec2Temp"),
-            WattsSensorEntity(dataHolder, self, "pd.typec2Watts"),
-            UsedTimeSensorEntity(dataHolder, self, "pd.typccUsedTime"),
-            UsedTimeSensorEntity(dataHolder, self, "pd.usbqcUsedTime"),
-            WattsSensorEntity(dataHolder, self, "pd.usb1Watts"),
-            WattsSensorEntity(dataHolder, self, "pd.usb2Watts"),
-            UsedTimeSensorEntity(dataHolder, self, "pd.usbUsedTime"),
-            InWattsSensorEntity(dataHolder, self, "pd.wattsInSum"),
-            OutWattsSensorEntity(dataHolder, self, "pd.wattsOutSum"),
-            MiscSensorEntity(dataHolder, self, "pd.wifiAutoRcvy"),
-            MiscSensorEntity(dataHolder, self, "pd.wifiRssi"),
-            MiscSensorEntity(dataHolder, self, "pd.wifiVer"),
-            WattsSensorEntity(dataHolder, self, "pd.wirelessWatts"),
-            # Status
+            "pd.iconAcFreqMode",
+            "pd.iconAcFreqState",
+            "pd.iconBmsErrMode",
+            "pd.iconBmsErrState",
+            "pd.iconBmsParallelMode",
+            "pd.iconBmsParallelState",
+            "pd.iconBtMode",
+            "pd.iconBtState",
+            "pd.iconCarMode",
+            "pd.iconCarState",
+            "pd.iconChgStationMode",
+            "pd.iconChgStationState",
+            "pd.iconCoGasMode",
+            "pd.iconCoGasState",
+            "pd.iconEcoMode",
+            "pd.iconEcoState",
+            "pd.iconFactoryMode",
+            "pd.iconFactoryState",
+            "pd.iconFanMode",
+            "pd.iconFanState",
+            "pd.iconGasGenMode",
+            "pd.iconGasGenState",
+            "pd.iconHiTempMode",
+            "pd.iconHiTempState",
+            "pd.iconInvParallelMode",
+            "pd.iconInvParallelState",
+            "pd.iconLowTempMode",
+            "pd.iconLowTempState",
+            "pd.iconOverloadMode",
+            "pd.iconOverloadState",
+            "pd.iconPackHeaterMode",
+            "pd.iconPackHeaterState",
+            "pd.iconRcMode",
+            "pd.iconRcState",
+            "pd.iconRechgTimeMode",
+            "pd.iconRechgTimeState",
+            "pd.iconSocUpsMode",
+            "pd.iconSocUpsState",
+            "pd.iconSolarBracketMode",
+            "pd.iconSolarBracketState",
+            "pd.iconSolarPanelMode",
+            "pd.iconSolarPanelState",
+            "pd.iconTransSwMode",
+            "pd.iconTransSwState",
+            "pd.iconTypecMode",
+            "pd.iconTypecState",
+            "pd.iconUsbMode",
+            "pd.iconUsbState",
+            "pd.iconWifiMode",
+            "pd.iconWifiState",
+            "pd.iconWindGenMode",
+            "pd.iconWindGenState",
+            "pd.iconWirelessChgMode",
+            "pd.iconWirelessChgState",
+        ]
+
+        found_keys = set(
+            battery_keys
+            + brightness_keys
+            + current_keys
+            + cycles_keys
+            + duration_keys
+            + energy_keys
+            + energy_storage_keys
+            + ignored_keys
+            + power_keys
+            + [product_info_details_key]
+            + temperature_keys
+            + voltage_keys
+        )
+
+        found_string_keys = set()
+
+        # Extract string keys from found_keys
+        for key in found_keys:
+            if isinstance(key, str):
+                found_string_keys.add(key)
+            elif isinstance(key, tuple):
+                found_string_keys.add(key[0])
+
+        diagnostic_keys = device_info_keys - found_string_keys
+
+        diagnostic_sensors = [
+            DiagnosticSensorEntity(dataHolder, self, key) for key in diagnostic_keys
+        ]
+
+        return [
+            *battery_sensors,
+            *brightness_sensors,
+            *current_sensors,
+            *cycles_sensors,
+            *diagnostic_sensors,
+            *duration_sensors,
+            *energy_sensors,
+            *energy_storage_sensors,
+            *power_sensors,
+            *product_info_detail_sensors,
             StatusSensorEntity(dataHolder, self),
+            *temperature_sensors,
+            *voltage_sensors,
         ]

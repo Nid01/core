@@ -6,17 +6,17 @@ from homeassistant.components.sensor import SensorEntity
 
 from ..api import EcoFlowIoTOpenDataHolder
 from ..sensor import (
-    AmpSensorEntity,
+    BatterySensorEntity,
     BrightnessSensorEntity,
     CountSensorEntity,
-    DeciwattSensorEntity,
+    CurrentSensorEntity,
+    DiagnosticSensorEntity,
+    DurationSensorEntity,
     FrequencySensorEntity,
-    LevelSensorEntity,
-    MiscSensorEntity,
-    RemainingTimeSensorEntity,
+    PowerSensorEntity,
     StatusSensorEntity,
-    TempSensorEntity,
-    VoltSensorEntity,
+    TemperateSensorEntity,
+    VoltageSensorEntity,
 )
 from . import BaseDevice
 
@@ -33,6 +33,9 @@ class PowerStream(BaseDevice):
         """Available sensors for PowerStream."""
 
         device_info_keys = set(self._device_info.keys())
+        device_info_keys.remove("deviceName")
+        device_info_keys.remove("online")
+        device_info_keys.remove("sn")
 
         count_keys = [
             "iot.resetCount",
@@ -44,7 +47,7 @@ class PowerStream(BaseDevice):
             if key in device_info_keys
         ]
 
-        deciwatt_keys = [
+        power_keys = [
             "iot.acSetWatts",
             "iot.antiBackFlowFlag",
             "iot.batErrorInvLoadLimit",
@@ -70,25 +73,30 @@ class PowerStream(BaseDevice):
             "iot.spaceDemandWatts",
         ]
 
-        deciwatt_sensors = [
-            DeciwattSensorEntity(dataHolder, self, key)
-            for key in deciwatt_keys
+        power_sensors = [
+            PowerSensorEntity(
+                dataHolder,
+                self,
+                key,
+                0.1,
+            )
+            for key in power_keys
             if key in device_info_keys
         ]
 
-        level_keys = [
+        battery_keys = [
             "iot.batSoc",
             "Iot.lowerLimit",
             "Iot.upperLimit",
         ]
 
-        level_sensors = [
-            LevelSensorEntity(dataHolder, self, key)
-            for key in level_keys
+        battery_sensors = [
+            BatterySensorEntity(dataHolder, self, key)
+            for key in battery_keys
             if key in device_info_keys
         ]
 
-        amp_keys = [
+        current_keys = [
             "iot.batInputCur",
             "iot.bmsReqChgAmp",
             "iot.invOutputCur",
@@ -96,9 +104,9 @@ class PowerStream(BaseDevice):
             "iot.pv2InputCur",
         ]
 
-        amp_sensors = [
-            AmpSensorEntity(dataHolder, self, key)
-            for key in amp_keys
+        current_sensors = [
+            CurrentSensorEntity(dataHolder, self, key)
+            for key in current_keys
             if key in device_info_keys
         ]
 
@@ -127,7 +135,7 @@ class PowerStream(BaseDevice):
         ]
 
         voltage_sensors = [
-            VoltSensorEntity(dataHolder, self, key)
+            VoltageSensorEntity(dataHolder, self, key)
             for key in voltage_keys
             if key in device_info_keys
         ]
@@ -152,7 +160,7 @@ class PowerStream(BaseDevice):
             if key in device_info_keys
         ]
 
-        temp_keys = [
+        temperature_keys = [
             "iot.batTemp",
             "iot.invTemp",
             "iot.llcTemp",
@@ -160,20 +168,20 @@ class PowerStream(BaseDevice):
             "iot.pv2Temp",
         ]
 
-        temp_sensors = [
-            TempSensorEntity(dataHolder, self, key, factor=10)
-            for key in temp_keys
+        temperature_sensors = [
+            TemperateSensorEntity(dataHolder, self, key, factor=0.1)
+            for key in temperature_keys
             if key in device_info_keys
         ]
 
-        remaining_time_keys = [
+        duration_keys = [
             "iot.chgRemainTime",
             "iot.dsgRemainTime",
         ]
 
-        remaining_time_sensors = [
-            RemainingTimeSensorEntity(dataHolder, self, key)
-            for key in remaining_time_keys
+        duration_sensors = [
+            DurationSensorEntity(dataHolder, self, key)
+            for key in duration_keys
             if key in device_info_keys
         ]
 
@@ -194,44 +202,40 @@ class PowerStream(BaseDevice):
             "iot.task11",
             "iot.2_1",
             "iot.2_2",
-            "deviceName",
-            "online",
-            "sn",
         ]
 
         found_keys = set(
-            count_keys
-            + deciwatt_keys
-            + level_keys
-            + amp_keys
-            + frequency_keys
-            + voltage_keys
-            # + milli_voltage_keys
+            battery_keys
             + brightness_keys
-            + temp_keys
-            + remaining_time_keys
+            + count_keys
+            + current_keys
+            + duration_keys
+            + frequency_keys
             + ignored_keys
+            + power_keys
+            + temperature_keys
+            + voltage_keys
         )
-        remaining_keys = device_info_keys - found_keys
 
-        misc_sensors = [
-            MiscSensorEntity(dataHolder, self, key) for key in remaining_keys
+        diagnostic_keys = device_info_keys - found_keys
+
+        diagnostic_sensors = [
+            DiagnosticSensorEntity(dataHolder, self, key) for key in diagnostic_keys
         ]
 
-        return (
-            count_sensors
-            + deciwatt_sensors
-            + level_sensors
-            + amp_sensors
-            + frequency_sensors
-            + voltage_sensors
-            # + milli_voltage_sensors
-            + brightness_sensors
-            + temp_sensors
-            + remaining_time_sensors
-            + misc_sensors
-            + [StatusSensorEntity(dataHolder, self)]
-        )
+        return [
+            *battery_sensors,
+            *brightness_sensors,
+            *count_sensors,
+            *current_sensors,
+            *duration_sensors,
+            *diagnostic_sensors,
+            *frequency_sensors,
+            *power_sensors,
+            *voltage_sensors,
+            StatusSensorEntity(dataHolder, self),
+            *temperature_sensors,
+        ]
 
     # def datetimes(...)..
     # DateTimeEntity(dataHolder, self, "iot.updateTime"),

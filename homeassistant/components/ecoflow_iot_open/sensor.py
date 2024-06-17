@@ -6,6 +6,7 @@ from collections import OrderedDict
 from collections.abc import Callable, Mapping
 from datetime import datetime, timedelta
 from functools import cached_property
+import json
 import math
 from typing import Any
 
@@ -22,6 +23,7 @@ from homeassistant.const import (
     EntityCategory,
     UnitOfElectricCurrent,
     UnitOfElectricPotential,
+    UnitOfEnergy,
     UnitOfFrequency,
     UnitOfPower,
     UnitOfTemperature,
@@ -107,7 +109,14 @@ class BaseSensorEntity(SensorEntity):
         self._attr_name = (
             f"{device.device_name} {title}"  # f"{device.device_name}_{mqtt_key}"
         )
-        if mqtt_key in ("iot.switchState", "kit.productInfoDetails"):
+        if mqtt_key in (
+            "iot.switchState",
+            "kit.productInfoDetails",
+            "bmsMaster.cellVol",
+            "bmsSlave1.cellVol",
+            "bmsMaster.cellTemp",
+            "bmsSlave1.cellTemp",
+        ):
             unique_id = f"{device.serial_number}_{mqtt_key}_{title.replace(' ', '_').replace('-', '_').replace('.', '_')}"
         else:
             unique_id = f"{device.serial_number}_{mqtt_key}"
@@ -197,169 +206,7 @@ class BaseSensorEntity(SensorEntity):
         self._update_callback = update_callback
 
 
-class ChargingStateSensorEntity(BaseSensorEntity):
-    """Sensor for battery charging state."""
-
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_icon = "mdi:battery-charging"
-    # _attr_device_class = BinarySensorDeviceClass.BATTERY_CHARGING
-
-    def _update_value(self, val: Any) -> bool:
-        if val == 0:
-            return super()._update_value("unused")
-        if val == 1:
-            return super()._update_value("charging")
-        if val == 2:
-            return super()._update_value("discharging")
-        return super()._update_value(val)
-
-
-class CyclesSensorEntity(BaseSensorEntity):
-    """Sensor for battery cycles."""
-
-    # _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_icon = "mdi:battery-heart-variant"
-    _attr_state_class = SensorStateClass.TOTAL_INCREASING
-
-
-class CountSensorEntity(BaseSensorEntity):
-    """Sensor for counter."""
-
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_state_class = SensorStateClass.TOTAL_INCREASING
-
-
-class MiscSensorEntity(BaseSensorEntity):
-    """Sensor for miscellaneous values."""
-
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-
-
-class ModeSensorEntity(BaseSensorEntity):
-    """Sensor for mode."""
-
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-
-    def _update_value(self, val: Any) -> bool:
-        if val == 0:
-            return super()._update_value("Manual")
-        if val == 1:
-            return super()._update_value("Auto")
-        return super()._update_value(val)
-
-
-class ScenesSensorEntity(BaseSensorEntity):
-    """Sensor for scene."""
-
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-
-    def _update_value(self, val: Any) -> bool:
-        if val == 0:
-            return super()._update_value("Balcony")
-        if val == 1:
-            return super()._update_value("Courtyard")
-        return super()._update_value(val)
-
-    @cached_property
-    def icon(self) -> str | None:
-        """Scenes icon handling."""
-
-        if self.state == "Balcony":
-            return "mdi:format-text-rotation-angle-up"
-        if self.state == "Courtyard":
-            return "mdi:angle-acute"
-        return None
-        # return "mdi:eye"
-
-
-class ModeWordSensorEntity(BaseSensorEntity):
-    """Sensor for mode as word."""
-
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-
-    def _update_value(self, val: Any) -> bool:
-        if val == 3:
-            return super()._update_value("Standby")
-        if val == 4:
-            return super()._update_value("Manual mode")
-        if val == 5:
-            return super()._update_value("Tracking sunlight")
-        if val == 6:
-            return super()._update_value("Detecting sunlight")
-        if val == 7:
-            return super()._update_value("Leveling out")
-        return super()._update_value(val)
-
-
-class BeeperSensorEntity(BaseSensorEntity):
-    """Sensor for beeper."""
-
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-
-    def _update_value(self, val: Any) -> bool:
-        if val & (1 << 0):
-            return super()._update_value("On")
-        return super()._update_value("Off")
-
-    @cached_property
-    def icon(self) -> str:
-        """Icon for beeper volume."""
-        if self.state == "On":
-            return "mdi:volume-high"
-        return "mdi:volume-mute"
-
-
-class RainProtectionSensorEntity(BaseSensorEntity):
-    """Sensor for rain protection."""
-
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-
-    def _update_value(self, val: Any) -> bool:
-        if val & (1 << 1):
-            return super()._update_value("On")
-        return super()._update_value("Off")
-
-    @cached_property
-    def icon(self) -> str:
-        """Icon for rain protection sensor."""
-        if self.state == "On":
-            return "mdi:umbrella-outline"
-        return "mdi:umbrella-closed-variant"
-
-
-class WaterSensorEntity(BaseSensorEntity):
-    """Sensor for water registration."""
-
-    _attr_icon = "mdi:weather-rainy"
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-
-
-class WindSensorEntity(BaseSensorEntity):
-    """Sensor for wind registration."""
-
-    _attr_icon = "mdi:weather-windy-variant"
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-
-
-class WindProtectionSensorEntity(BaseSensorEntity):
-    """Sensor for wind protection."""
-
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-
-    def _update_value(self, val: Any) -> bool:
-        if val & (1 << 2):
-            return super()._update_value("On")
-        return super()._update_value("Off")
-
-    @cached_property
-    def icon(self) -> str:
-        """Icon for wind protection sensor."""
-        if self.state == "On":
-            return "mdi:windsock"
-        return "mdi:weather-windy"
-
-
-class LevelSensorEntity(BaseSensorEntity):
+class BatterySensorEntity(BaseSensorEntity):
     """Sensor for battery percentage level."""
 
     # _attr_entity_category = EntityCategory.DIAGNOSTIC
@@ -396,211 +243,219 @@ class LevelSensorEntity(BaseSensorEntity):
         return super()._update_value(val)
 
 
-class SecondsRemainSensorEntity(BaseSensorEntity):
-    """Sensor for remaining seconds."""
+class BeeperSensorEntity(BaseSensorEntity):
+    """Sensor for beeper."""
 
-    _attr_device_class = SensorDeviceClass.DURATION
-    _attr_native_unit_of_measurement = UnitOfTime.SECONDS
-    _attr_state_class = SensorStateClass.MEASUREMENT
-    # _attr_native_value = 0
-
-    def _update_value(self, val: Any) -> Any:
-        ival = int(val)
-        if ival < 0 or ival > 5000:
-            ival = 0
-
-        return super()._update_value(ival)
-
-
-class TempSensorEntity(BaseSensorEntity):
-    """Sensor for temperature."""
-
-    _attr_device_class = SensorDeviceClass.TEMPERATURE
-    # _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
-    _attr_state_class = SensorStateClass.MEASUREMENT
-    # _attr_native_value = -1
-
-    def __init__(
-        self,
-        dataHolder: EcoFlowIoTOpenDataHolder,
-        device: Any,
-        mqtt_key: str,
-        factor: int = 1,
-        title: str = "",
-        enabled: bool = True,
-        auto_enable: bool = False,
-    ) -> None:
-        """Initialize with factor three-digit values from PowerStream."""
-        super().__init__(dataHolder, device, mqtt_key, title, enabled, auto_enable)
-        self.factor = factor
-
-    def _update_value(self, val: Any) -> bool:
-        return super()._update_value(int(val) / self.factor)
-
-
-class RemainingTimeSensorEntity(BaseSensorEntity):
-    """Sensor for remaining minutes."""
-
-    _attr_device_class = SensorDeviceClass.DURATION
-    _attr_native_unit_of_measurement = UnitOfTime.MINUTES
-    _attr_state_class = SensorStateClass.MEASUREMENT
-    # _attr_native_value = 0
-
-
-class UsedTimeSensorEntity(BaseSensorEntity):
-    """Sensor for used minutes."""
-
-    _attr_device_class = SensorDeviceClass.DURATION
-    _attr_native_unit_of_measurement = UnitOfTime.MINUTES
-    _attr_state_class = SensorStateClass.MEASUREMENT
-    # _attr_native_value = 0
-
-
-class VoltSensorEntity(BaseSensorEntity):
-    """Sensor for voltage."""
-
-    _attr_device_class = SensorDeviceClass.VOLTAGE
-    # _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_native_unit_of_measurement = UnitOfElectricPotential.VOLT
-    _attr_state_class = SensorStateClass.MEASUREMENT
-    # _attr_native_value = 0
-
-    def _update_value(self, val: Any) -> bool:
-        return super()._update_value(int(val) / 1000)
-
-
-class MilliVoltSensorEntity(BaseSensorEntity):
-    """Sensor for millivoltage."""
-
-    _attr_device_class = SensorDeviceClass.VOLTAGE
-    # _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_native_unit_of_measurement = UnitOfElectricPotential.MILLIVOLT
-    # _attr_suggested_unit_of_measurement = UnitOfElectricPotential.VOLT
-    _attr_state_class = SensorStateClass.MEASUREMENT
-    # _attr_native_value = 0
-
-
-class InMilliVoltSensorEntity(MilliVoltSensorEntity):
-    """Sensor for imported millivoltage."""
-
-    _attr_icon = "mdi:transmission-tower-import"
-    _attr_suggested_display_precision = 0
-
-
-class OutMilliVoltSensorEntity(MilliVoltSensorEntity):
-    """Sensor for exported millivoltage."""
-
-    _attr_icon = "mdi:transmission-tower-export"
-    _attr_suggested_display_precision = 0
-
-
-class MilliAmpSensorEntity(BaseSensorEntity):
-    """Sensor for milliampere."""
-
-    _attr_device_class = SensorDeviceClass.CURRENT
     _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_native_unit_of_measurement = UnitOfElectricCurrent.MILLIAMPERE
-    _attr_state_class = SensorStateClass.MEASUREMENT
-    # _attr_native_value = 0
+
+    def _update_value(self, val: Any) -> bool:
+        if val & (1 << 0):
+            return super()._update_value("On")
+        return super()._update_value("Off")
+
+    @cached_property
+    def icon(self) -> str:
+        """Icon for beeper volume."""
+        if self.state == "On":
+            return "mdi:volume-high"
+        return "mdi:volume-mute"
 
 
-class AmpSensorEntity(BaseSensorEntity):
-    """Sensor for ampere."""
+class BrightnessSensorEntity(BaseSensorEntity):
+    """Sensor for brightness from a range 0-1023 converted to 0-100."""
 
-    _attr_device_class = SensorDeviceClass.CURRENT
     _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_native_unit_of_measurement = UnitOfElectricCurrent.AMPERE
-    _attr_state_class = SensorStateClass.MEASUREMENT
-    # _attr_native_value = 0
+    _attr_native_unit_of_measurement = PERCENTAGE
 
     def _update_value(self, val: Any) -> bool:
-        return super()._update_value(int(val) / 1000)
+        return super()._update_value(
+            round(max(0, min(100, (val - 0) / (1023 - 0) * (100 - 0) + 0)))
+        )
 
 
-class WattsSensorEntity(BaseSensorEntity):
-    """Sensor for watts."""
+class ChargingStateSensorEntity(BaseSensorEntity):
+    """Sensor for battery charging state."""
 
-    _attr_device_class = SensorDeviceClass.POWER
-    _attr_native_unit_of_measurement = UnitOfPower.WATT
-    _attr_state_class = SensorStateClass.MEASUREMENT
-    # _attr_native_value = 0
-
-    def __init__(
-        self,
-        dataHolder: EcoFlowIoTOpenDataHolder,
-        device: Any,
-        mqtt_key: str,
-        list_position: int | None = None,
-        mqtt_key2: str | None = None,
-        title: str = "",
-        enabled: bool = True,
-        auto_enable: bool = False,
-    ) -> None:
-        """Initialize with list_position and additional dictionary key, when passed on."""
-        if (
-            isinstance(list_position, int)
-            and isinstance(mqtt_key2, str)
-            and title == ""
-        ):
-            title = str(list_position) + "-" + mqtt_key2
-
-        super().__init__(dataHolder, device, mqtt_key, title, enabled, auto_enable)
-        self._list_position = list_position
-        self._mqtt_key2 = mqtt_key2
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:battery-charging"
+    # _attr_device_class = BinarySensorDeviceClass.BATTERY_CHARGING
 
     def _update_value(self, val: Any) -> bool:
-        if isinstance(self._list_position, int) and isinstance(self._mqtt_key2, str):
-            return super()._update_value(val[self._list_position].get(self._mqtt_key2))
+        if val == 0:
+            return super()._update_value("unused")
+        if val == 1:
+            return super()._update_value("charging")
+        if val == 2:
+            return super()._update_value("discharging")
         return super()._update_value(val)
 
 
-class CapacitySensorEntity(BaseSensorEntity):
+class CountSensorEntity(BaseSensorEntity):
+    """Sensor for counter."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+
+
+class CurrentSensorEntity(BaseSensorEntity):
+    """Sensor for ampere with different units."""
+
+    _attr_device_class = SensorDeviceClass.CURRENT
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(
+        self,
+        dataHolder: EcoFlowIoTOpenDataHolder,
+        device,
+        key: str,
+        unit=UnitOfElectricCurrent.AMPERE,
+    ) -> None:
+        """Initialize with unit for ampere and default to ampere."""
+        self.dataHolder = dataHolder
+        self.device = device
+        self.key = key
+        self._attr_native_unit_of_measurement = unit
+        super().__init__(dataHolder, device, key)
+
+    def _update_value(self, val: Any) -> bool:
+        if self._attr_native_unit_of_measurement == UnitOfElectricCurrent.MILLIAMPERE:
+            return super()._update_value(int(val))
+        return super()._update_value(int(val) / 1000)
+
+
+# class MilliAmpSensorEntity(BaseSensorEntity):
+#     """Sensor for milliampere."""
+
+#     _attr_device_class = SensorDeviceClass.CURRENT
+#     _attr_entity_category = EntityCategory.DIAGNOSTIC
+#     _attr_native_unit_of_measurement = UnitOfElectricCurrent.MILLIAMPERE
+#     _attr_state_class = SensorStateClass.MEASUREMENT
+#     # _attr_native_value = 0
+
+
+class CyclesSensorEntity(BaseSensorEntity):
+    """Sensor for battery cycles."""
+
+    # _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:battery-heart-variant"
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+
+
+class DegreeSensorEntity(BaseSensorEntity):
+    """Sensor for angle."""
+
+    # _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_native_unit_of_measurement = DEGREE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    # _attr_native_value = 0
+    _attr_icon = "mdi:format-text-rotation-angle-up"
+
+    def _update_value(self, val: Any) -> bool:
+        return super()._update_value(float(val) + 10.0) if float(val) <= 75 else False
+
+
+class DiagnosticSensorEntity(BaseSensorEntity):
+    """Sensor for miscellaneous values."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    # 255
+
+    def _update_value(self, val: Any) -> bool:
+        if isinstance(val, dict):
+            val_str = json.dumps(val)
+            if len(val_str) > 255:
+                return super()._update_value(val_str[:255])
+            return super()._update_value(val)
+        return super()._update_value(val)
+
+
+class DurationSensorEntity(BaseSensorEntity):
+    """Sensor for remaining minutes."""
+
+    _attr_device_class = SensorDeviceClass.DURATION
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    # _attr_native_value = 0
+
+    def __init__(
+        self,
+        dataHolder: EcoFlowIoTOpenDataHolder,
+        device,
+        key: str,
+        unit=UnitOfTime.MINUTES,
+    ) -> None:
+        """Initialize with unit for duration and default to minutes."""
+        self.dataHolder = dataHolder
+        self.device = device
+        self.key = key
+        self._attr_native_unit_of_measurement = unit
+        super().__init__(dataHolder, device, key)
+
+
+# class SecondsRemainSensorEntity(BaseSensorEntity):
+#     """Sensor for remaining seconds."""
+
+#     _attr_device_class = SensorDeviceClass.DURATION
+#     _attr_native_unit_of_measurement = UnitOfTime.SECONDS
+#     _attr_state_class = SensorStateClass.MEASUREMENT
+#     # _attr_native_value = 0
+
+#     def _update_value(self, val: Any) -> Any:
+#         ival = int(val)
+#         if ival < 0 or ival > 5000:
+#             ival = 0
+
+#         return super()._update_value(ival)
+
+
+# class TimeUsedSensorEntity(BaseSensorEntity):
+#     """Sensor for used minutes."""
+
+#     _attr_device_class = SensorDeviceClass.DURATION
+#     _attr_native_unit_of_measurement = UnitOfTime.MINUTES
+#     _attr_state_class = SensorStateClass.MEASUREMENT
+#     # _attr_native_value = 0
+
+
+class EnergySensorEntity(BaseSensorEntity):
+    """Sensor for energy."""
+
+    _attr_device_class = SensorDeviceClass.ENERGY
+    _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+
+    def _update_value(self, val: Any) -> bool:
+        ival = int(val)
+        if ival > 0:
+            return super()._update_value(ival / 1000)
+        # TODO Reevaluate code and note why False should be returned, when ival is not above 0  # pylint: disable=fixme
+        return False
+
+
+class EnergyStorageSensorEntity(BaseSensorEntity):
     """Sensor for capacity."""
 
     _attr_device_class = SensorDeviceClass.ENERGY_STORAGE
-    _attr_native_unit_of_measurement = "mAh"
+    _attr_native_unit_of_measurement = "Ah"  # "mAh"
     _attr_state_class = SensorStateClass.MEASUREMENT
 
+    def _update_value(self, val: Any) -> bool:
+        return super()._update_value(int(val) / 1000)
 
-class DeciwattSensorEntity(WattsSensorEntity):
-    """Sensor for deciwatts."""
+
+class FrequencySensorEntity(BaseSensorEntity):
+    """Sensor for frequency."""
+
+    _attr_device_class = SensorDeviceClass.FREQUENCY
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_native_unit_of_measurement = UnitOfFrequency.HERTZ
+    _attr_state_class = SensorStateClass.MEASUREMENT
 
     def _update_value(self, val: Any) -> bool:
         return super()._update_value(int(val) / 10)
 
 
-class InWattsSensorEntity(WattsSensorEntity):
-    """Sensor for imported watts."""
-
-    _attr_icon = "mdi:transmission-tower-import"
-
-
-class OutWattsSensorEntity(WattsSensorEntity):
-    """Sensor for exported watts."""
-
-    _attr_icon = "mdi:transmission-tower-export"
-
-
-class InWattsSolarSensorEntity(InWattsSensorEntity):
-    """Sensor for watts imported from solar panels."""
-
-    _attr_icon = "mdi:solar-power"
-
-    def _update_value(self, val: Any) -> bool:
-        return super()._update_value(int(val) / 10)
-
-
-class OutWattsDcSensorEntity(WattsSensorEntity):
-    """Sensor for exported watts with direct current."""
-
-    _attr_icon = "mdi:transmission-tower-export"
-
-    def _update_value(self, val: Any) -> bool:
-        return super()._update_value(int(val) / 10)
-
-
-class LuxSensorEntity(BaseSensorEntity):
+class IlluminanceSensorEntity(BaseSensorEntity):
     """Sensor for lux."""
 
     # _attr_entity_category = EntityCategory.DIAGNOSTIC
@@ -613,18 +468,19 @@ class LuxSensorEntity(BaseSensorEntity):
     def icon(self) -> str:
         """Lux grade icon handling."""
 
-        if self.state < 30000:
-            return "mdi:brightness-5"
-        if self.state < 80000:
-            return "mdi:brightness-6"
-        if self.state < 130000:
-            return "mdi:brightness-4"
-        if self.state >= 130000:
-            return "mdi:brightness-7"
+        if isinstance(self.state, int):
+            if self.state < 30000:
+                return "mdi:brightness-5"
+            if self.state < 80000:
+                return "mdi:brightness-6"
+            if self.state < 130000:
+                return "mdi:brightness-4"
+            if self.state >= 130000:
+                return "mdi:brightness-7"
         return "mdi:brightness-5"
 
 
-class LuxGradeSensorEntity(BaseSensorEntity):
+class IlluminanceGradeSensorEntity(BaseSensorEntity):
     """Sensor for lux grade."""
 
     # _attr_entity_category = EntityCategory.DIAGNOSTIC
@@ -656,32 +512,118 @@ class LuxGradeSensorEntity(BaseSensorEntity):
         return "mdi:brightness-5"
 
 
-class AngleSensorEntity(BaseSensorEntity):
-    """Sensor for angle."""
+class ModeSensorEntity(BaseSensorEntity):
+    """Sensor for mode."""
 
-    # _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_native_unit_of_measurement = DEGREE
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def _update_value(self, val: Any) -> bool:
+        if val == 0:
+            return super()._update_value("Manual")
+        if val == 1:
+            return super()._update_value("Auto")
+        return super()._update_value(val)
+
+
+class ModeAsWordSensorEntity(BaseSensorEntity):
+    """Sensor for mode as word."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def _update_value(self, val: Any) -> bool:
+        if val == 3:
+            return super()._update_value("Standby")
+        if val == 4:
+            return super()._update_value("Manual mode")
+        if val == 5:
+            return super()._update_value("Tracking sunlight")
+        if val == 6:
+            return super()._update_value("Detecting sunlight")
+        if val == 7:
+            return super()._update_value("Leveling out")
+        return super()._update_value(val)
+
+
+class PowerSensorEntity(BaseSensorEntity):
+    """Sensor for watts."""
+
+    _attr_device_class = SensorDeviceClass.POWER
+    _attr_native_unit_of_measurement = UnitOfPower.WATT
     _attr_state_class = SensorStateClass.MEASUREMENT
     # _attr_native_value = 0
-    _attr_icon = "mdi:format-text-rotation-angle-up"
+
+    def __init__(
+        self,
+        dataHolder: EcoFlowIoTOpenDataHolder,
+        device: Any,
+        mqtt_key: str,
+        factor: float = 1,
+        list_position: int | None = None,
+        mqtt_key2: str | None = None,
+        title: str = "",
+        enabled: bool = True,
+        auto_enable: bool = False,
+    ) -> None:
+        """Initialize with list_position and additional dictionary key, when passed on."""
+        if (
+            isinstance(list_position, int)
+            and isinstance(mqtt_key2, str)
+            and title == ""
+        ):
+            title = str(list_position) + "-" + mqtt_key2
+
+        super().__init__(dataHolder, device, mqtt_key, title, enabled, auto_enable)
+        self._factor = factor
+        self._list_position = list_position
+        self._mqtt_key2 = mqtt_key2
 
     def _update_value(self, val: Any) -> bool:
-        return super()._update_value(float(val) + 10.0) if float(val) <= 75 else False
+        if isinstance(self._list_position, int) and isinstance(self._mqtt_key2, str):
+            return super()._update_value(
+                int(val[self._list_position].get(self._mqtt_key2)) * self._factor
+            )
+
+        return super()._update_value(int(val) * self._factor)
 
 
-class FrequencySensorEntity(BaseSensorEntity):
-    """Sensor for frequency."""
+# class DeciPowerSensorEntity(PowerSensorEntity):
+#     """Sensor for deciwatts."""
 
-    _attr_device_class = SensorDeviceClass.FREQUENCY
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_native_unit_of_measurement = UnitOfFrequency.HERTZ
-    _attr_state_class = SensorStateClass.MEASUREMENT
-
-    def _update_value(self, val: Any) -> bool:
-        return super()._update_value(int(val) / 10)
+#     def _update_value(self, val: Any) -> bool:
+#         return super()._update_value(int(val) / 10)
 
 
-class ProductInfoDetailsSensorEntity(BaseSensorEntity):
+# class InPowerSensorEntity(PowerSensorEntity):
+#     """Sensor for imported watts."""
+
+#     _attr_icon = "mdi:transmission-tower-import"
+
+
+# class OutPowerSensorEntity(PowerSensorEntity):
+#     """Sensor for exported watts."""
+
+#     _attr_icon = "mdi:transmission-tower-export"
+
+
+# class InPowerSolarSensorEntity(InPowerSensorEntity):
+#     """Sensor for watts imported from solar panels."""
+
+#     _attr_icon = "mdi:solar-power"
+
+#     def _update_value(self, val: Any) -> bool:
+#         return super()._update_value(int(val) / 10)
+
+
+# class OutPowerDcSensorEntity(PowerSensorEntity):
+#     """Sensor for exported watts with direct current."""
+
+#     _attr_icon = "mdi:transmission-tower-export"
+
+#     def _update_value(self, val: Any) -> bool:
+#         return super()._update_value(int(val) / 10)
+
+
+class ProductInfoDetailSensorEntity(BaseSensorEntity):
     """Sensor for product info details."""
 
     _attr_entity_category = EntityCategory.DIAGNOSTIC
@@ -699,7 +641,7 @@ class ProductInfoDetailsSensorEntity(BaseSensorEntity):
     ) -> None:
         """Initialize with list_position and additional dictionary key."""
         if title == "":
-            title = str(list_position) + "-" + mqtt_key2
+            title = "Port-" + str(list_position) + "-" + mqtt_key2
 
         if mqtt_key2 == "curPower":
             _attr_device_class = SensorDeviceClass.POWER
@@ -715,16 +657,46 @@ class ProductInfoDetailsSensorEntity(BaseSensorEntity):
         return super()._update_value(val[self._list_position].get(self._mqtt_key2))
 
 
-class BrightnessSensorEntity(BaseSensorEntity):
-    """Sensor for brightness from a range 0-1023 converted to 0-100."""
+class ProtectionFromRainSensorEntity(BaseSensorEntity):
+    """Sensor for rain protection."""
 
     _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_native_unit_of_measurement = PERCENTAGE
 
     def _update_value(self, val: Any) -> bool:
-        return super()._update_value(
-            round(max(0, min(100, (val - 0) / (1023 - 0) * (100 - 0) + 0)))
-        )
+        if val & (1 << 1):
+            return super()._update_value("On")
+        return super()._update_value("Off")
+
+    @cached_property
+    def icon(self) -> str:
+        """Icon for rain protection sensor."""
+        if self.state == "On":
+            return "mdi:umbrella-outline"
+        return "mdi:umbrella-closed-variant"
+
+
+class ScenesSensorEntity(BaseSensorEntity):
+    """Sensor for scene."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def _update_value(self, val: Any) -> bool:
+        if val == 0:
+            return super()._update_value("Balcony")
+        if val == 1:
+            return super()._update_value("Courtyard")
+        return super()._update_value(val)
+
+    @cached_property
+    def icon(self) -> str | None:
+        """Scenes icon handling."""
+
+        if self.state == "Balcony":
+            return "mdi:format-text-rotation-angle-up"
+        if self.state == "Courtyard":
+            return "mdi:angle-acute"
+        return None
+        # return "mdi:eye"
 
 
 class StatusSensorEntity(BaseSensorEntity):
@@ -823,6 +795,142 @@ class StatusSensorEntity(BaseSensorEntity):
     def extra_state_attributes(self) -> Mapping[str, Any] | None:
         """Return the device-specific state attributes."""
         return self._attrs
+
+
+class TemperateSensorEntity(BaseSensorEntity):
+    """Sensor for temperature."""
+
+    _attr_device_class = SensorDeviceClass.TEMPERATURE
+    # _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    # _attr_native_value = -1
+
+    def __init__(
+        self,
+        dataHolder: EcoFlowIoTOpenDataHolder,
+        device: Any,
+        mqtt_key: str,
+        factor: float = 1,
+        list_position: int | None = None,
+        title: str = "",
+        enabled: bool = True,
+        auto_enable: bool = False,
+    ) -> None:
+        """Initialize with list_position, when passed on."""
+        if isinstance(list_position, int) and title == "":
+            title = mqtt_key + "-" + str(list_position).zfill(2)
+
+        super().__init__(dataHolder, device, mqtt_key, title, enabled, auto_enable)
+        self._list_position = list_position
+        self._factor = factor
+
+    def _update_value(self, val: Any) -> bool:
+        if self._list_position is not None:
+            try:
+                value = val[self._list_position]
+            except (IndexError, TypeError, ValueError):
+                return False
+        else:
+            value = val
+        if value < 10000:
+            return super()._update_value(value * self._factor)
+        # cellTemp-0, ellTemp-1, cellTemp-2, ... show unsually high values like 12374
+        return super()._update_value(value / 1000 * self._factor)
+
+
+# class MilliVoltSensorEntity(BaseSensorEntity):
+#     """Sensor for millivoltage."""
+
+#     _attr_device_class = SensorDeviceClass.VOLTAGE
+#     # _attr_entity_category = EntityCategory.DIAGNOSTIC
+#     _attr_native_unit_of_measurement = UnitOfElectricPotential.MILLIVOLT
+#     # _attr_suggested_unit_of_measurement = UnitOfElectricPotential.VOLT
+#     _attr_state_class = SensorStateClass.MEASUREMENT
+#     # _attr_native_value = 0
+
+
+# class InMilliVoltSensorEntity(MilliVoltSensorEntity):
+#     """Sensor for imported millivoltage."""
+
+#     _attr_icon = "mdi:transmission-tower-import"
+#     _attr_suggested_display_precision = 0
+
+
+# class OutMilliVoltSensorEntity(MilliVoltSensorEntity):
+#     """Sensor for exported millivoltage."""
+
+#     _attr_icon = "mdi:transmission-tower-export"
+#     _attr_suggested_display_precision = 0
+
+
+class VoltageSensorEntity(BaseSensorEntity):
+    """Sensor for voltage."""
+
+    _attr_device_class = SensorDeviceClass.VOLTAGE
+    # _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_native_unit_of_measurement = UnitOfElectricPotential.VOLT
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    # _attr_native_value = 0
+
+    def __init__(
+        self,
+        dataHolder: EcoFlowIoTOpenDataHolder,
+        device: Any,
+        mqtt_key: str,
+        list_position: int | None = None,
+        title: str = "",
+        enabled: bool = True,
+        auto_enable: bool = False,
+    ) -> None:
+        """Initialize with list_position, when passed on."""
+        if isinstance(list_position, int) and title == "":
+            title = mqtt_key + "-" + str(list_position).zfill(2)
+
+        super().__init__(dataHolder, device, mqtt_key, title, enabled, auto_enable)
+        self._list_position = list_position
+
+    def _update_value(self, val: Any) -> bool:
+        if self._list_position is not None:
+            try:
+                value = int(val[self._list_position]) / 1000
+            except (IndexError, TypeError, ValueError):
+                return False
+        else:
+            value = int(val) / 1000
+        return super()._update_value(value)
+
+
+class WaterSensorEntity(BaseSensorEntity):
+    """Sensor for water registration."""
+
+    _attr_icon = "mdi:weather-rainy"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+
+class ProtectionFromWindSensorEntity(BaseSensorEntity):
+    """Sensor for wind protection."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def _update_value(self, val: Any) -> bool:
+        if val & (1 << 2):
+            return super()._update_value("On")
+        return super()._update_value("Off")
+
+    @cached_property
+    def icon(self) -> str:
+        """Icon for wind protection sensor."""
+        if self.state == "On":
+            return "mdi:windsock"
+        return "mdi:weather-windy"
+
+
+class WindSensorEntity(BaseSensorEntity):
+    """Sensor for wind registration."""
+
+    _attr_icon = "mdi:weather-windy-variant"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
 
 # class EcoFlowIoTOpenSensor(BaseSensorEntity, SensorEntity):
