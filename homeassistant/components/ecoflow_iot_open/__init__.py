@@ -65,10 +65,10 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     try:
         products = await api.get_devices_by_product(
             [
-                # ProductType.DELTA_MAX,
+                ProductType.DELTA_MAX,
                 ProductType.POWERSTREAM,
-                # ProductType.SINGLE_AXIS_SOLAR_TRACKER,
-                # ProductType.SMART_PLUG,
+                ProductType.SINGLE_AXIS_SOLAR_TRACKER,
+                ProductType.SMART_PLUG,
             ]
         )
     except (ClientError, GenericHTTPError, InvalidResponseFormat) as err:

@@ -1,18 +1,12 @@
 """The EcoFlow IoT Open integration."""
 
-# from .products.powerstream import PowerStream
-# from .products.single_axis_solar_tracker import SingleAxisSolarTracker
-# from .products.smart_plug import SmartPlug
 from datetime import datetime
 import logging
 from typing import Any
 
-# from paho.mqtt import client as mqtt
 from reactivex import Observable, Subject
 
 from homeassistant.util import dt as dt_util
-
-# from .products import BaseDevice
 
 _LOGGER = logging.getLogger(__name__)
 

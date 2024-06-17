@@ -1,8 +1,22 @@
 """Define package errors."""
 
+from homeassistant.exceptions import HomeAssistantError
 
-class EcoFlowIoTOpenError(Exception):
+
+class EcoFlowIoTOpenError(HomeAssistantError):
     """Custom exception for EcoFlow IoT Open API errors."""
+
+
+class CannotConnect(HomeAssistantError):
+    """Error to indicate we cannot connect."""
+
+
+class ClientError(EcoFlowIoTOpenError):
+    """Base class for client connection errors."""
+
+
+class GenericHTTPError(EcoFlowIoTOpenError):
+    """Generic HTTP error."""
 
 
 class InvalidCredentialsError(EcoFlowIoTOpenError):
@@ -13,13 +27,5 @@ class InvalidResponseFormat(EcoFlowIoTOpenError):
     """Raised when an invalid response format is received."""
 
 
-class GenericHTTPError(EcoFlowIoTOpenError):
-    """Generic HTTP error."""
-
-
 class MqttError(EcoFlowIoTOpenError):
     """MQTT error."""
-
-
-class ClientError(EcoFlowIoTOpenError):
-    """Base class for client connection errors."""
