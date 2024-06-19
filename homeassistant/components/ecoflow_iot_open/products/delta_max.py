@@ -8,7 +8,9 @@ from homeassistant.const import UnitOfElectricCurrent, UnitOfTime
 from ..api import EcoFlowIoTOpenDataHolder
 from ..sensor import (
     BatterySensorEntity,
+    BinaryStateSensorEntity,
     BrightnessSensorEntity,
+    ChargingStateSensorEntity,
     CurrentSensorEntity,
     CyclesSensorEntity,
     DiagnosticSensorEntity,
@@ -81,6 +83,16 @@ class DELTAMax(BaseDevice):
             if key in device_info_keys
         ]
 
+        binary_state_keys = [
+            "inv.fanState",
+        ]
+
+        binary_state_sensors = [
+            BinaryStateSensorEntity(dataHolder, self, key)
+            for key in binary_state_keys
+            if key in device_info_keys
+        ]
+
         brightness_keys = [
             "pd.lcdBrightness",
         ]
@@ -88,6 +100,17 @@ class DELTAMax(BaseDevice):
         brightness_sensors = [
             BrightnessSensorEntity(dataHolder, self, key)
             for key in brightness_keys
+            if key in device_info_keys
+        ]
+
+        charging_state_keys = [
+            "pd.sysChgDsgState",
+            "ems.chgState",
+        ]
+
+        charging_state_sensors = [
+            ChargingStateSensorEntity(dataHolder, self, key)
+            for key in charging_state_keys
             if key in device_info_keys
         ]
 
@@ -425,12 +448,15 @@ class DELTAMax(BaseDevice):
         diagnostic_keys = device_info_keys - found_string_keys
 
         diagnostic_sensors = [
-            DiagnosticSensorEntity(dataHolder, self, key) for key in diagnostic_keys
+            DiagnosticSensorEntity(dataHolder, self, key, enabled=False)
+            for key in diagnostic_keys
         ]
 
         return [
+            *binary_state_sensors,
             *battery_sensors,
             *brightness_sensors,
+            *charging_state_sensors,
             *current_sensors,
             *cycles_sensors,
             *diagnostic_sensors,

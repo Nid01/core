@@ -243,8 +243,8 @@ class BatterySensorEntity(BaseSensorEntity):
         return super()._update_value(val)
 
 
-class BeeperSensorEntity(BaseSensorEntity):
-    """Sensor for beeper."""
+class BinaryStateSensorEntity(BaseSensorEntity):
+    """Sensor for binary states on/off."""
 
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
@@ -255,10 +255,18 @@ class BeeperSensorEntity(BaseSensorEntity):
 
     @cached_property
     def icon(self) -> str:
-        """Icon for beeper volume."""
-        if self.state == "On":
-            return "mdi:volume-high"
-        return "mdi:volume-mute"
+        """Icon for binary state in context of mqtt key."""
+        if self.__attributes_mapping[self._mqtt_key] == "beeper":
+            if self.state == "On":
+                return "mdi:volume-high"
+            return "mdi:volume-mute"
+        if self._mqtt_key == "inv.fanState":
+            if self.state == "On":
+                return "mdi:fan"
+            return "mdi:fan-off"
+        if self.state == "on":
+            return "mdi:toggle-switch-variant"
+        return "mdi:toggle-switch-variant-off"
 
 
 class BrightnessSensorEntity(BaseSensorEntity):
@@ -290,6 +298,7 @@ class ChargingStateSensorEntity(BaseSensorEntity):
         return super()._update_value(val)
 
 
+# TODO Merge CountSensorEntity and CyclesSensorEntity # pylint: disable=fixme
 class CountSensorEntity(BaseSensorEntity):
     """Sensor for counter."""
 
@@ -333,6 +342,7 @@ class CurrentSensorEntity(BaseSensorEntity):
 #     # _attr_native_value = 0
 
 
+# TODO Merge CountSensorEntity and CyclesSensorEntity # pylint: disable=fixme
 class CyclesSensorEntity(BaseSensorEntity):
     """Sensor for battery cycles."""
 
@@ -908,6 +918,7 @@ class WaterSensorEntity(BaseSensorEntity):
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
 
+# TODO Merge ProtectionSensorEntities # pylint: disable=fixme
 class ProtectionFromWindSensorEntity(BaseSensorEntity):
     """Sensor for wind protection."""
 

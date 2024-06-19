@@ -8,7 +8,7 @@ from homeassistant.const import UnitOfTime
 from ..api import EcoFlowIoTOpenDataHolder
 from ..sensor import (
     BatterySensorEntity,
-    BeeperSensorEntity,
+    BinaryStateSensorEntity,
     ChargingStateSensorEntity,
     DegreeSensorEntity,
     DiagnosticSensorEntity,
@@ -78,7 +78,8 @@ class SingleAxisSolarTracker(BaseDevice):
         diagnostic_keys = device_info_keys - found_keys
 
         diagnostic_sensors = [
-            DiagnosticSensorEntity(dataHolder, self, key) for key in diagnostic_keys
+            DiagnosticSensorEntity(dataHolder, self, key, enabled=False)
+            for key in diagnostic_keys
         ]
 
         # DiagnosticSensorEntity(dataHolder, self, "iot.errCode"),
@@ -87,7 +88,7 @@ class SingleAxisSolarTracker(BaseDevice):
 
         return [
             BatterySensorEntity(dataHolder, self, "iot.batteryPercent"),
-            BeeperSensorEntity(dataHolder, self, "iot.switchState", "beeper"),
+            BinaryStateSensorEntity(dataHolder, self, "iot.switchState", "beeper"),
             ChargingStateSensorEntity(dataHolder, self, "iot.chargeState"),
             *degree_sensors,
             *diagnostic_sensors,

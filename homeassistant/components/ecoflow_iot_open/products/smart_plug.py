@@ -5,7 +5,16 @@ from collections.abc import Sequence
 from homeassistant.components.sensor import SensorEntity
 
 from ..api import EcoFlowIoTOpenDataHolder
-from ..sensor import DiagnosticSensorEntity, PowerSensorEntity
+from ..sensor import (
+    BinaryStateSensorEntity,
+    CountSensorEntity,
+    CurrentSensorEntity,
+    DiagnosticSensorEntity,
+    FrequencySensorEntity,
+    PowerSensorEntity,
+    TemperateSensorEntity,
+    VoltageSensorEntity,
+)
 from . import BaseDevice
 
 
@@ -25,49 +34,97 @@ class SmartPlug(BaseDevice):
         device_info_keys.remove("online")
         device_info_keys.remove("sn")
 
-        # "consNum": 1,
-        # "consWatt": 0,
-        # "country": 17477,
-        # "current": 139,
-        # "errCode": 0,
-        # "freq": 50,
-        # "geneNum": 1,
-        # "geneWatt": 2989,
-        # "heartbeatFrequency": 2,
-        # "lanState": 4,
-        # "matterFabric": 2,
-        # "maxCur": 0,
-        # "maxWatts": 2500,
-        # "meshEnable": 0,
-        # "meshId": 11245728,
-        # "meshLayel": 1,
-        # "mqttErr": 6,
-        # "mqttErrTime": 1694016157,
-        # "otaDlErr": 0,
-        # "otaDlTlsErr": 0,
-        # "parentMac": 0,
-        # "parentWifiRssi": -45,
-        # "resetCount": 8,
-        # "resetReason": 1,
-        # "rtcResetReason": 1,
-        # "runTime": 431,
-        # "selfEmsSwitch": 1,
-        # "selfMac": 3401870404,
-        # "staIpAddr": 821340352,
-        # "stackFree": 66,
-        # "stackMinFree": 37,
-        # "switchSta": true,
-        # "temp": 22,
-        # "town": 0,
-        # "updateTime": "2024-03-31 06:39:00",
-        # "volt": 231,
-        # "warnCode": 0,
-        # "watts": 10,
-        # "wifiErr": 8,
-        # "wifiErrTime": 1710885604,
+        binary_state_keys = [
+            "iot.switchSta",
+        ]
+
+        binary_state_ensors = [
+            BinaryStateSensorEntity(dataHolder, self, key)
+            for key in binary_state_keys
+            if key in device_info_keys
+        ]
+
+        count_keys = [
+            "iot.resetCount",
+        ]
+
+        count_sensors = [
+            CountSensorEntity(dataHolder, self, key)
+            for key in count_keys
+            if key in device_info_keys
+        ]
+
+        current_keys = [
+            "iot.current",
+            "iot.maxCur",
+        ]
+
+        current_sensors = [
+            CurrentSensorEntity(dataHolder, self, key)
+            for key in current_keys
+            if key in device_info_keys
+        ]
+
+        current_keys = [
+            "iot.current",
+            "iot.maxCur",
+        ]
+
+        current_sensors = [
+            CurrentSensorEntity(dataHolder, self, key)
+            for key in current_keys
+            if key in device_info_keys
+        ]
+
+        frequency_keys = [
+            "iot.freq",
+        ]
+
+        frequency_sensors = [
+            FrequencySensorEntity(dataHolder, self, key)
+            for key in frequency_keys
+            if key in device_info_keys
+        ]
+
+        power_keys = [
+            "iot.consWatt",
+            "iot.geneWatt",
+            "iot.maxWatts",
+            "iot.watts",
+        ]
+
+        power_sensors = [
+            PowerSensorEntity(
+                dataHolder,
+                self,
+                key,
+                0.1,
+            )
+            for key in power_keys
+            if key in device_info_keys
+        ]
+
+        temperature_keys = [
+            "iot.temp",
+        ]
+
+        temperature_sensors = [
+            TemperateSensorEntity(dataHolder, self, key)
+            for key in temperature_keys
+            if key in device_info_keys
+        ]
+
+        voltage_keys = [
+            "iot.volt",
+        ]
+
+        voltage_sensors = [
+            VoltageSensorEntity(dataHolder, self, key)
+            for key in voltage_keys
+            if key in device_info_keys
+        ]
 
         ignored_keys = [
-            "iot.watts",
             "iot.task1",
             "iot.task2",
             "iot.task3",
@@ -81,19 +138,30 @@ class SmartPlug(BaseDevice):
             "iot.task11",
         ]
 
-        found_keys = set(ignored_keys)
+        found_keys = set(
+            binary_state_keys
+            + count_keys
+            + current_keys
+            + frequency_keys
+            + ignored_keys
+            + power_keys
+            + temperature_keys
+            + voltage_keys
+        )
 
         diagnostic_keys = device_info_keys - found_keys
 
         diagnostic_sensors = [
-            DiagnosticSensorEntity(dataHolder, self, key) for key in diagnostic_keys
+            DiagnosticSensorEntity(dataHolder, self, key, enabled=False)
+            for key in diagnostic_keys
         ]
         return [
+            *binary_state_ensors,
+            *count_sensors,
+            *current_sensors,
             *diagnostic_sensors,
-            PowerSensorEntity(
-                dataHolder=dataHolder,
-                device=self,
-                mqtt_key="iot.watts",
-                title="watts",
-            ),
+            *frequency_sensors,
+            *power_sensors,
+            *temperature_sensors,
+            *voltage_sensors,
         ]
