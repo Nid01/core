@@ -1,8 +1,5 @@
 """The EcoFlow IoT Open integration."""
 
-# from .products.powerstream import PowerStream
-# from .products.single_axis_solar_tracker import SingleAxisSolarTracker
-# from .products.smart_plug import SmartPlug
 from datetime import timedelta
 import logging
 
@@ -23,8 +20,6 @@ from .const import (
     PRODUCTS,
     ProductType,
 )
-
-# from paho.mqtt import client as mqtt
 from .data_holder import EcoFlowIoTOpenDataHolder
 from .errors import (
     ClientError,
@@ -33,9 +28,6 @@ from .errors import (
     InvalidCredentialsError,
     InvalidResponseFormat,
 )
-
-# from .products import BaseDevice
-
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -92,17 +84,6 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     for devices in products.values():
         for device in devices.values():
             device.set_update_callback(update_published)
-
-    # async def resubscribe(now):
-    #     """Resubscribe to MQTT updates."""
-    #     await hass.async_add_executor_job(api.unsubscribe)
-    #     api.subscribe()
-
-    #     # refresh even required?
-    #     # await asyncio.sleep(60)
-    #     # await api.refresh_devices()
-
-    # config_entry.async_on_unload(async_track_time_interval(hass, resubscribe, INTERVAL))
 
     return True
 

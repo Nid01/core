@@ -46,8 +46,6 @@ from .errors import (
     InvalidCredentialsError,
     InvalidResponseFormat,
 )
-
-# from .products import BaseDevice
 from .products import ProductType
 from .products.delta_max import DELTAMax
 from .products.powerstream import PowerStream
@@ -134,7 +132,6 @@ class EcoFlowIoTOpenAPIInterface:
         self._secretKey = secretKey
         self._base_url = base_url
         self._certification: dict[str, Any]
-        # self._products: dict[ProductType, dict[str, BaseDevice]] = {}
         self._products: dict[ProductType, dict[str, Any]] = {}
         self._mqtt_client: Client
         self._mqtt_listener: Optional[asyncio.Task] = None
