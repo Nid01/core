@@ -107,7 +107,9 @@ class BaseSensorEntity(SensorEntity):
             title = mqtt_key
 
         self._attr_name = (
-            f"{device.device_name} {title}"  # f"{device.device_name}_{mqtt_key}"
+            f"{title}"
+            # f"{device.device_name} {title}"
+            # f"{device.device_name}_{mqtt_key}"
         )
         if mqtt_key in (
             "iot.switchState",
