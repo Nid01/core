@@ -258,7 +258,7 @@ class BinaryStateSensorEntity(BaseSensorEntity):
     @cached_property
     def icon(self) -> str:
         """Icon for binary state in context of mqtt key."""
-        if self.__attributes_mapping[self._mqtt_key] == "beeper":
+        if self._attr_name == "beeper":
             if self.state == "On":
                 return "mdi:volume-high"
             return "mdi:volume-mute"
