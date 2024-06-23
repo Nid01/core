@@ -22,6 +22,7 @@ import hashlib
 import hmac
 import json
 import logging
+import os
 import random
 import ssl
 import time
@@ -33,6 +34,8 @@ from aiomqtt import Client, MqttCodeError
 from multidict import CIMultiDict
 
 # from paho.mqtt import client as mqtt
+from homeassistant.core import DOMAIN as HA_DOMAIN
+
 from .const import DELTA_MAX, POWERSTREAM, SINGLE_AXIS_SOLAR_TRACKER, SMART_PLUG
 from .data_holder import EcoFlowIoTOpenDataHolder
 from .errors import (
@@ -405,14 +408,28 @@ class EcoFlowIoTOpenAPIInterface:
             raise EcoFlowIoTOpenError("Missing EcoFlowIoTOpenDataHolder")
 
     def _get_client_id(self) -> str:
-        """Generate a unique client ID.
+        """Generate a client ID based on the environment and access key.
+
+        This method checks for the existence of the `.devcontainer` directory
+        to determine if the Home Assistant instance is running in a development
+        environment. If the directory exists, the environment is set to
+        "development"; otherwise, it is set to "production".
+
+        The method then returns a client ID string formatted as
+        "HomeAssistant_<environment>_<accessKey>", where `<environment>`
+        is either "development" or "production" and `<accessKey>` is an
+        instance attribute.
 
         Returns:
-            str: Unique client ID.
+            str: A client ID string that includes the environment and access key.
 
         """
-        # To-Do: Create and store a persistent unique client ID throughout recreation and reload of the integration or else the API refuses the mqtt connection when to many different client IDs try to connect.
-        return f"HomeAssistant_{self._accessKey}"  # _{str(uuid.uuid4()).upper()}"
+        if os.path.exists(".devcontainer"):
+            environment = "development"
+        else:
+            environment = "production"
+
+        return f"{HA_DOMAIN}_{environment}_{self._accessKey}"
 
     async def _request(self, method: str, url: str, **kwargs) -> dict[str, Any]:
         """Make an HTTP request to EcoFlow's API.
