@@ -423,7 +423,9 @@ class DELTAMax(BaseDevice):
 
         found_keys = set(
             battery_keys
+            + binary_state_keys
             + brightness_keys
+            + charging_state_keys
             + current_keys
             + cycles_keys
             + duration_keys
