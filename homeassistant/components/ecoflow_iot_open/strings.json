@@ -17,5 +17,18 @@
     "abort": {
       "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
     }
+  },
+  "issues": {
+    "mqtt_connection": {
+      "title": "EcoFlow IoT Open MQTT connection error",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "EcoFlow IoT Open MQTT connection error",
+            "description": "The EcoFlow IoT Open integration ran into an issue while interacting with EcoFlow's MQTT broker.\nThe following error occurred:\n{exception}\n\nConfirming this repair will trigger a disconnect from and reconnect to the MQTT broker."
+          }
+        }
+      }
+    }
   }
 }
