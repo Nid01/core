@@ -83,7 +83,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
 
     await api.initializeDevices()
 
-    await api.connect()
+    await api.connect(hass, config_entry)
 
     def update_published():
         """Handle a push update."""

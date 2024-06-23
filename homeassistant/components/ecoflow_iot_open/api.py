@@ -34,9 +34,11 @@ from aiomqtt import Client, MqttCodeError
 from multidict import CIMultiDict
 
 # from paho.mqtt import client as mqtt
-from homeassistant.core import DOMAIN as HA_DOMAIN
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import DOMAIN as HA_DOMAIN, HomeAssistant
+from homeassistant.helpers.issue_registry import IssueSeverity, async_create_issue
 
-from .const import DELTA_MAX, POWERSTREAM, SINGLE_AXIS_SOLAR_TRACKER, SMART_PLUG
+from .const import DELTA_MAX, DOMAIN, POWERSTREAM, SINGLE_AXIS_SOLAR_TRACKER, SMART_PLUG
 from .data_holder import EcoFlowIoTOpenDataHolder
 from .errors import (
     EcoFlowIoTOpenError,
@@ -135,8 +137,10 @@ class EcoFlowIoTOpenAPIInterface:
         # self._products: dict[ProductType, dict[str, BaseDevice]] = {}
         self._products: dict[ProductType, dict[str, Any]] = {}
         self._mqtt_client: Client
-        self.mqtt_listener: Optional[asyncio.Task] = None
+        self._mqtt_listener: Optional[asyncio.Task] = None
         self._data_holder = data_holder
+        self._reconnects = 0
+        self._max_reconnects = 3
 
     @classmethod
     async def certification(
@@ -275,67 +279,87 @@ class EcoFlowIoTOpenAPIInterface:
             raise InvalidResponseFormat(response)
         _LOGGER.info("Successfully retrieved MQTT credentials")
 
-    async def connect(self):
+    async def connect(self, hass: HomeAssistant, config_entry: ConfigEntry):
         """Establish a connection to the MQTT broker."""
-        if self.mqtt_listener:
+        if self._mqtt_listener:
             _LOGGER.warning("MQTT listener is already running")
             return
-        self.mqtt_listener = asyncio.create_task(self.subscribe())
+        self._reconnects = 0
+        self._mqtt_listener = asyncio.create_task(self.subscribe(hass, config_entry))
 
     async def disconnect(self):
         """Disconnect from the MQTT broker."""
-        if self.mqtt_listener:
-            self.mqtt_listener.cancel()
+        if self._mqtt_listener:
+            self._mqtt_listener.cancel()
             try:
-                await self.mqtt_listener
+                await self._mqtt_listener
             except asyncio.CancelledError:
                 _LOGGER.info("MQTT listener task has been cancelled")
-            self.mqtt_listener = None
+            self._mqtt_listener = None
         else:
             _LOGGER.warning("MQTT listener is not running")
 
-    async def subscribe(self):
+    async def subscribe(self, hass: HomeAssistant, config_entry: ConfigEntry):
         """Subscribe to MQTT topics."""
         if not self._products:
             _LOGGER.error("No products found. Did you call setup before subscribing?")
             return
 
-        try:
-            async with Client(
-                hostname=self._certification["url"],
-                port=int(self._certification["port"]),
-                username=self._certification["certificateAccount"],
-                password=self._certification["certificatePassword"],
-                logger=_CLIENT_LOGGER,
-                identifier=self._get_client_id(),
-                tls_insecure=False,
-                tls_params=aiomqtt.TLSParameters(
-                    cert_reqs=ssl.CERT_REQUIRED,
-                ),
-            ) as client:
-                topics_qos: list[tuple[str, int]] = [
-                    (
-                        f"/open/{self._certification["certificateAccount"]}/{device.serial_number}/status",
-                        1,
-                    )
-                    for devices in self._products.values()
-                    for device in devices.values()
-                ]
-                topics_qos += [
-                    (
-                        f"/open/{self._certification["certificateAccount"]}/{device.serial_number}/quota",
-                        1,
-                    )
-                    for devices in self._products.values()
-                    for device in devices.values()
-                ]
-                await client.subscribe(topics_qos)
-                async for message in client.messages:
-                    if isinstance(message.payload, bytes):
-                        await self._handle_mqtt_message(message)
+        while self._reconnects < self._max_reconnects:
+            try:
+                async with Client(
+                    hostname=self._certification["url"],
+                    port=int(self._certification["port"]),
+                    username=self._certification["certificateAccount"],
+                    password=self._certification["certificatePassword"],
+                    logger=_CLIENT_LOGGER,
+                    identifier=self._get_client_id(),
+                    tls_insecure=False,
+                    tls_params=aiomqtt.TLSParameters(
+                        cert_reqs=ssl.CERT_REQUIRED,
+                    ),
+                ) as client:
+                    topics_qos: list[tuple[str, int]] = [
+                        (
+                            f"/open/{self._certification["certificateAccount"]}/{device.serial_number}/status",
+                            1,
+                        )
+                        for devices in self._products.values()
+                        for device in devices.values()
+                    ]
+                    topics_qos += [
+                        (
+                            f"/open/{self._certification["certificateAccount"]}/{device.serial_number}/quota",
+                            1,
+                        )
+                        for devices in self._products.values()
+                        for device in devices.values()
+                    ]
+                    await client.subscribe(topics_qos)
+                    async for message in client.messages:
+                        if isinstance(message.payload, bytes):
+                            await self._handle_mqtt_message(message)
 
-        except MqttCodeError:
-            _LOGGER.exception("Exception during subscription")
+            except MqttCodeError as exception:
+                self._reconnects = self._reconnects + 1
+                _LOGGER.exception(
+                    "Exception during subscription. %s reconnects left",
+                    self._max_reconnects - self._reconnects,
+                )
+                if self._reconnects == self._max_reconnects:
+                    async_create_issue(
+                        hass,
+                        DOMAIN,
+                        DOMAIN + "_mqtt_connection",
+                        is_fixable=True,
+                        issue_domain=DOMAIN,
+                        severity=IssueSeverity.ERROR,
+                        translation_key="mqtt_connection",
+                        data={"entry_id": config_entry.entry_id},
+                        translation_placeholders={
+                            "exception": f"[ReasonCode: {exception.rc}] {exception.args}"
+                        },
+                    )
 
     async def _handle_mqtt_message(self, message):
         """Handle incoming MQTT messages.
