@@ -108,13 +108,20 @@ class PowerStream(BaseDevice):
             "iot.acSetWatts",
             "iot.antiBackFlowFlag",
             "iot.batErrorInvLoadLimit",
-            "iot.batInputWatts",
+            # "iot.batInputWatts",
             "iot.batOutputLoadLimit",
             "iot.consWatt",
             "iot.dynamicWatts",
             "iot.floadLimitOut",
             "iot.geneWatt",
             "iot.gridConsWatts",
+            # "iot.historyBatInputWatts",
+            "iot.historyGridConsWatts",
+            "iot.historyInvOutputWatts",
+            "iot.historyInvToPlugWatts",
+            "iot.historyPermanentWatts",
+            "iot.historyPlugTotalWatts",
+            "iot.historyPvToInvWatts",
             "iot.invDemandWatts",
             "iot.invOutputLoadLimit",
             "iot.invOutputWatts",
@@ -140,6 +147,50 @@ class PowerStream(BaseDevice):
             for key in power_keys
             if key in device_info_keys
         ]
+
+        power_sensors.append(
+            PowerSensorEntity(
+                dataHolder,
+                self,
+                "iot.batInputWatts",
+                0.1,
+                value_filter="negative",
+                title="iot.batInputWatts",
+            )
+        )
+
+        power_sensors.append(
+            PowerSensorEntity(
+                dataHolder,
+                self,
+                "iot.batInputWatts",
+                0.1,
+                value_filter="positive",
+                title="iot.batOutputWatts",
+            )
+        )
+
+        power_sensors.append(
+            PowerSensorEntity(
+                dataHolder,
+                self,
+                "iot.historyBatInputWatts",
+                0.1,
+                value_filter="negative",
+                title="iot.historyBatInputWatts",
+            )
+        )
+
+        power_sensors.append(
+            PowerSensorEntity(
+                dataHolder,
+                self,
+                "iot.historyBatInputWatts",
+                0.1,
+                value_filter="positive",
+                title="iot.historyBatOutputWatts",
+            )
+        )
 
         temperature_keys = [
             "iot.batTemp",
@@ -186,6 +237,8 @@ class PowerStream(BaseDevice):
         # ]
 
         ignored_keys = [
+            "iot.batInputWatts",
+            "iot.historyBatInputWatts",
             "iot.updateTime",
             "iot.wifiErrTime",  # Parse integer value as datetime?
             "iot.mqttErrTime",  # Parse integer value as datetime?
