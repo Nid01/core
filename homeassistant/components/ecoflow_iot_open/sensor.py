@@ -112,12 +112,14 @@ class BaseSensorEntity(SensorEntity):
             # f"{device.device_name}_{mqtt_key}"
         )
         if mqtt_key in (
-            "iot.switchState",
-            "kit.productInfoDetails",
-            "bmsMaster.cellVol",
-            "bmsSlave1.cellVol",
             "bmsMaster.cellTemp",
+            "bmsMaster.cellVol",
             "bmsSlave1.cellTemp",
+            "bmsSlave1.cellVol",
+            "iot.batInputWatts",
+            "iot.historyBatInputWatts",
+            "kit.productInfoDetails",
+            "iot.switchState",
         ):
             unique_id = f"{device.serial_number}_{mqtt_key}_{title.replace(' ', '_').replace('-', '_').replace('.', '_')}"
         else:
@@ -570,6 +572,7 @@ class PowerSensorEntity(BaseSensorEntity):
         device: Any,
         mqtt_key: str,
         factor: float = 1,
+        value_filter: str | None = None,
         list_position: int | None = None,
         mqtt_key2: str | None = None,
         title: str = "",
@@ -586,6 +589,7 @@ class PowerSensorEntity(BaseSensorEntity):
 
         super().__init__(dataHolder, device, mqtt_key, title, enabled, auto_enable)
         self._factor = factor
+        self._value_filter = value_filter
         self._list_position = list_position
         self._mqtt_key2 = mqtt_key2
 
@@ -594,6 +598,12 @@ class PowerSensorEntity(BaseSensorEntity):
             return super()._update_value(
                 int(val[self._list_position].get(self._mqtt_key2)) * self._factor
             )
+        if self._mqtt_key in ("iot.batInputWatts", "iot.historyBatInputWatts"):
+            if (self._value_filter == "positive" and not val >= 0) or (
+                self._value_filter == "negative" and not val <= 0
+            ):
+                return False
+            return super()._update_value(abs(int(val)) * self._factor)
 
         return super()._update_value(int(val) * self._factor)
 
@@ -669,6 +679,7 @@ class ProductInfoDetailSensorEntity(BaseSensorEntity):
         return super()._update_value(val[self._list_position].get(self._mqtt_key2))
 
 
+# TODO Merge ProtectionSensorEntities # pylint: disable=fixme
 class ProtectionFromRainSensorEntity(BaseSensorEntity):
     """Sensor for rain protection."""
 
@@ -685,6 +696,24 @@ class ProtectionFromRainSensorEntity(BaseSensorEntity):
         if self.state == "On":
             return "mdi:umbrella-outline"
         return "mdi:umbrella-closed-variant"
+
+
+class ProtectionFromWindSensorEntity(BaseSensorEntity):
+    """Sensor for wind protection."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def _update_value(self, val: Any) -> bool:
+        if val & (1 << 2):
+            return super()._update_value("On")
+        return super()._update_value("Off")
+
+    @cached_property
+    def icon(self) -> str:
+        """Icon for wind protection sensor."""
+        if self.state == "On":
+            return "mdi:windsock"
+        return "mdi:weather-windy"
 
 
 class ScenesSensorEntity(BaseSensorEntity):
@@ -918,25 +947,6 @@ class WaterSensorEntity(BaseSensorEntity):
 
     _attr_icon = "mdi:weather-rainy"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
-
-
-# TODO Merge ProtectionSensorEntities # pylint: disable=fixme
-class ProtectionFromWindSensorEntity(BaseSensorEntity):
-    """Sensor for wind protection."""
-
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-
-    def _update_value(self, val: Any) -> bool:
-        if val & (1 << 2):
-            return super()._update_value("On")
-        return super()._update_value("Off")
-
-    @cached_property
-    def icon(self) -> str:
-        """Icon for wind protection sensor."""
-        if self.state == "On":
-            return "mdi:windsock"
-        return "mdi:weather-windy"
 
 
 class WindSensorEntity(BaseSensorEntity):
