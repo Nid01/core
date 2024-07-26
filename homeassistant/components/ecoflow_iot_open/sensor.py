@@ -602,7 +602,7 @@ class PowerSensorEntity(BaseSensorEntity):
             if (self._value_filter == "positive" and not val >= 0) or (
                 self._value_filter == "negative" and not val <= 0
             ):
-                return False
+                return super()._update_value(0)
             return super()._update_value(abs(int(val)) * self._factor)
 
         return super()._update_value(int(val) * self._factor)
