@@ -336,16 +336,6 @@ class CurrentSensorEntity(BaseSensorEntity):
         return super()._update_value(int(val) / 1000)
 
 
-# class MilliAmpSensorEntity(BaseSensorEntity):
-#     """Sensor for milliampere."""
-
-#     _attr_device_class = SensorDeviceClass.CURRENT
-#     _attr_entity_category = EntityCategory.DIAGNOSTIC
-#     _attr_native_unit_of_measurement = UnitOfElectricCurrent.MILLIAMPERE
-#     _attr_state_class = SensorStateClass.MEASUREMENT
-#     # _attr_native_value = 0
-
-
 # TODO Merge CountSensorEntity and CyclesSensorEntity # pylint: disable=fixme
 class CyclesSensorEntity(BaseSensorEntity):
     """Sensor for battery cycles."""
@@ -404,31 +394,6 @@ class DurationSensorEntity(BaseSensorEntity):
         self.key = key
         self._attr_native_unit_of_measurement = unit
         super().__init__(dataHolder, device, key)
-
-
-# class SecondsRemainSensorEntity(BaseSensorEntity):
-#     """Sensor for remaining seconds."""
-
-#     _attr_device_class = SensorDeviceClass.DURATION
-#     _attr_native_unit_of_measurement = UnitOfTime.SECONDS
-#     _attr_state_class = SensorStateClass.MEASUREMENT
-#     # _attr_native_value = 0
-
-#     def _update_value(self, val: Any) -> Any:
-#         ival = int(val)
-#         if ival < 0 or ival > 5000:
-#             ival = 0
-
-#         return super()._update_value(ival)
-
-
-# class TimeUsedSensorEntity(BaseSensorEntity):
-#     """Sensor for used minutes."""
-
-#     _attr_device_class = SensorDeviceClass.DURATION
-#     _attr_native_unit_of_measurement = UnitOfTime.MINUTES
-#     _attr_state_class = SensorStateClass.MEASUREMENT
-#     # _attr_native_value = 0
 
 
 class EnergySensorEntity(BaseSensorEntity):
@@ -606,13 +571,6 @@ class PowerSensorEntity(BaseSensorEntity):
             return super()._update_value(abs(int(val)) * self._factor)
 
         return super()._update_value(int(val) * self._factor)
-
-
-# class DeciPowerSensorEntity(PowerSensorEntity):
-#     """Sensor for deciwatts."""
-
-#     def _update_value(self, val: Any) -> bool:
-#         return super()._update_value(int(val) / 10)
 
 
 # class InPowerSensorEntity(PowerSensorEntity):
@@ -878,17 +836,6 @@ class TemperateSensorEntity(BaseSensorEntity):
             return super()._update_value(value * self._factor)
         # cellTemp-0, ellTemp-1, cellTemp-2, ... show unsually high values like 12374
         return super()._update_value(value / 1000 * self._factor)
-
-
-# class MilliVoltSensorEntity(BaseSensorEntity):
-#     """Sensor for millivoltage."""
-
-#     _attr_device_class = SensorDeviceClass.VOLTAGE
-#     # _attr_entity_category = EntityCategory.DIAGNOSTIC
-#     _attr_native_unit_of_measurement = UnitOfElectricPotential.MILLIVOLT
-#     # _attr_suggested_unit_of_measurement = UnitOfElectricPotential.VOLT
-#     _attr_state_class = SensorStateClass.MEASUREMENT
-#     # _attr_native_value = 0
 
 
 # class InMilliVoltSensorEntity(MilliVoltSensorEntity):
