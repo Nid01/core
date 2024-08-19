@@ -5,7 +5,9 @@ from collections.abc import Sequence
 import logging
 from typing import Any
 
+from homeassistant.components.number import NumberEntity
 from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.switch import SwitchEntity
 
 from ..const import (
     DELTA_MAX,
@@ -14,6 +16,10 @@ from ..const import (
     SMART_PLUG,
     ProductType,
 )
+
+# from ..number import BaseNumberEntity
+# from ..sensor import BaseSensorEntity
+# from ..switch import BaseSwitchEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -71,9 +77,17 @@ class BaseDevice(ABC):
             )
 
     @abstractmethod
-    def sensors(self, dataHolder) -> Sequence[SensorEntity]:
+    def sensors(self, api) -> Sequence[SensorEntity]:  # Sequence[BaseSensorEntity]:
         """Return a empty list of SensorEntityDescription."""
         # pass
+
+    @abstractmethod
+    def switches(self, api) -> Sequence[SwitchEntity]:  # Sequence[BaseSwitchEntity]:
+        """Return a empty list of SwitchEntity."""
+
+    @abstractmethod
+    def numbers(self, api) -> Sequence[NumberEntity]:  # Sequence[BaseNumberEntity]:
+        """Return a empty list of NumberEntity."""
 
     @staticmethod
     def _get_productType_for_sn_prefix(value: str) -> ProductType:

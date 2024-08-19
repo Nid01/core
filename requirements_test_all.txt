@@ -278,6 +278,9 @@ aiolyric==1.1.0
 # homeassistant.components.modern_forms
 aiomodernforms==0.1.8
 
+# homeassistant.components.ecoflow_iot_open
+aiomqtt==2.0.1
+
 # homeassistant.components.yamaha_musiccast
 aiomusiccast==0.14.8
 
@@ -1874,6 +1877,9 @@ radiotherm==2.1.0
 
 # homeassistant.components.rapt_ble
 rapt-ble==0.1.2
+
+# homeassistant.components.ecoflow_iot_open
+reactivex==4.0.4
 
 # homeassistant.components.refoss
 refoss-ha==1.2.0

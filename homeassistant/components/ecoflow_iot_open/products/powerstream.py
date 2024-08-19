@@ -2,22 +2,21 @@
 
 from collections.abc import Sequence
 
-from homeassistant.components.sensor import SensorEntity
-
-from ..api import EcoFlowIoTOpenDataHolder
+from ..api import EcoFlowIoTOpenAPIInterface
+from ..number import BaseNumberEntity, BatteryLevelEntity, BrightnessEntity, PowerEntity
 from ..sensor import (
+    BaseSensorEntity,
     BatterySensorEntity,
-    BrightnessSensorEntity,
     CountSensorEntity,
     CurrentSensorEntity,
     DiagnosticSensorEntity,
     DurationSensorEntity,
     FrequencySensorEntity,
     PowerSensorEntity,
-    StatusSensorEntity,
     TemperateSensorEntity,
     VoltageSensorEntity,
 )
+from ..switch import BaseSwitchEntity, PowerSupplyPriorityEntity
 from . import BaseDevice
 
 
@@ -29,7 +28,7 @@ class PowerStream(BaseDevice):
         super().__init__(device_info, api_interface)
         self._model = "PowerStream"
 
-    def sensors(self, dataHolder: EcoFlowIoTOpenDataHolder) -> Sequence[SensorEntity]:
+    def sensors(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[BaseSensorEntity]:
         """Available sensors for PowerStream."""
 
         device_info_keys = set(self._device_info.keys())
@@ -39,32 +38,30 @@ class PowerStream(BaseDevice):
 
         battery_keys = [
             "iot.batSoc",
-            "Iot.lowerLimit",
-            "Iot.upperLimit",
         ]
 
         battery_sensors = [
-            BatterySensorEntity(dataHolder, self, key)
+            BatterySensorEntity(api, self, key)
             for key in battery_keys
             if key in device_info_keys
         ]
 
-        brightness_keys = [
-            "iot.invBrightness",
-        ]
+        # brightness_keys = [
+        #     "iot.invBrightness",
+        # ]
 
-        brightness_sensors = [
-            BrightnessSensorEntity(dataHolder, self, key)
-            for key in brightness_keys
-            if key in device_info_keys
-        ]
+        # brightness_sensors = [
+        #     BrightnessSensorEntity(api, self, key)
+        #     for key in brightness_keys
+        #     if key in device_info_keys
+        # ]
 
         count_keys = [
             "iot.resetCount",
         ]
 
         count_sensors = [
-            CountSensorEntity(dataHolder, self, key)
+            CountSensorEntity(api, self, key)
             for key in count_keys
             if key in device_info_keys
         ]
@@ -78,7 +75,7 @@ class PowerStream(BaseDevice):
         ]
 
         current_sensors = [
-            CurrentSensorEntity(dataHolder, self, key)
+            CurrentSensorEntity(api, self, key)
             for key in current_keys
             if key in device_info_keys
         ]
@@ -89,7 +86,7 @@ class PowerStream(BaseDevice):
         ]
 
         duration_sensors = [
-            DurationSensorEntity(dataHolder, self, key)
+            DurationSensorEntity(api, self, key)
             for key in duration_keys
             if key in device_info_keys
         ]
@@ -99,7 +96,7 @@ class PowerStream(BaseDevice):
         ]
 
         frequency_sensors = [
-            FrequencySensorEntity(dataHolder, self, key)
+            FrequencySensorEntity(api, self, key, 10)
             for key in frequency_keys
             if key in device_info_keys
         ]
@@ -139,7 +136,7 @@ class PowerStream(BaseDevice):
 
         power_sensors = [
             PowerSensorEntity(
-                dataHolder,
+                api,
                 self,
                 key,
                 0.1,
@@ -150,7 +147,7 @@ class PowerStream(BaseDevice):
 
         power_sensors.append(
             PowerSensorEntity(
-                dataHolder,
+                api,
                 self,
                 "iot.batInputWatts",
                 0.1,
@@ -161,7 +158,7 @@ class PowerStream(BaseDevice):
 
         power_sensors.append(
             PowerSensorEntity(
-                dataHolder,
+                api,
                 self,
                 "iot.batInputWatts",
                 0.1,
@@ -172,7 +169,7 @@ class PowerStream(BaseDevice):
 
         power_sensors.append(
             PowerSensorEntity(
-                dataHolder,
+                api,
                 self,
                 "iot.historyBatInputWatts",
                 0.1,
@@ -183,7 +180,7 @@ class PowerStream(BaseDevice):
 
         power_sensors.append(
             PowerSensorEntity(
-                dataHolder,
+                api,
                 self,
                 "iot.historyBatInputWatts",
                 0.1,
@@ -192,8 +189,17 @@ class PowerStream(BaseDevice):
             )
         )
 
+        temperature_factors = {
+            "iot.batTemp": 0.1,
+            "iot.invTemp": 0.1,
+            "iot.llcTemp": 0.1,
+            "iot.pv1Temp": 0.1,
+            "iot.pv2Temp": 0.1,
+        }
+
         temperature_keys = [
             "iot.batTemp",
+            "iot.espTempsensor",
             "iot.invTemp",
             "iot.llcTemp",
             "iot.pv1Temp",
@@ -201,7 +207,12 @@ class PowerStream(BaseDevice):
         ]
 
         temperature_sensors = [
-            TemperateSensorEntity(dataHolder, self, key, factor=0.1)
+            TemperateSensorEntity(
+                api,
+                self,
+                key,
+                temperature_factors.get(key, 1),
+            )
             for key in temperature_keys
             if key in device_info_keys
         ]
@@ -221,7 +232,7 @@ class PowerStream(BaseDevice):
         ]
 
         voltage_sensors = [
-            VoltageSensorEntity(dataHolder, self, key)
+            VoltageSensorEntity(api, self, key)
             for key in voltage_keys
             if key in device_info_keys
         ]
@@ -237,11 +248,14 @@ class PowerStream(BaseDevice):
         # ]
 
         ignored_keys = [
+            "iot.2_1",
+            "iot.2_2",
             "iot.batInputWatts",
             "iot.historyBatInputWatts",
-            "iot.updateTime",
-            "iot.wifiErrTime",  # Parse integer value as datetime?
+            "iot.invBrightness",
+            "iot.lowerLimit",
             "iot.mqttErrTime",  # Parse integer value as datetime?
+            "iot.permanentWatts",
             "iot.task1",
             "iot.task2",
             "iot.task3",
@@ -253,13 +267,13 @@ class PowerStream(BaseDevice):
             "iot.task9",
             "iot.task10",
             "iot.task11",
-            "iot.2_1",
-            "iot.2_2",
+            "iot.updateTime",
+            "iot.upperLimit",
+            "iot.wifiErrTime",  # Parse integer value as datetime?
         ]
 
         found_keys = set(
             battery_keys
-            + brightness_keys
             + count_keys
             + current_keys
             + duration_keys
@@ -273,13 +287,12 @@ class PowerStream(BaseDevice):
         diagnostic_keys = device_info_keys - found_keys
 
         diagnostic_sensors = [
-            DiagnosticSensorEntity(dataHolder, self, key, enabled=False)
+            DiagnosticSensorEntity(api, self, key, enabled=False)
             for key in diagnostic_keys
         ]
 
         return [
             *battery_sensors,
-            *brightness_sensors,
             *count_sensors,
             *current_sensors,
             *duration_sensors,
@@ -287,8 +300,73 @@ class PowerStream(BaseDevice):
             *frequency_sensors,
             *power_sensors,
             *voltage_sensors,
-            StatusSensorEntity(dataHolder, self),
+            # StatusSensorEntity(api, self),
             *temperature_sensors,
+        ]
+
+    def switches(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[BaseSwitchEntity]:
+        """Available switches for PowerStream."""
+
+        return [
+            PowerSupplyPriorityEntity(
+                api,
+                self,
+                "iot.supplyPriority",
+                command=lambda value: {
+                    "cmdCode": "WN511_SET_SUPPLY_PRIORITY_PACK",
+                    "params": {"supplyPriority": value},
+                },
+            ),
+        ]
+
+    def numbers(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[BaseNumberEntity]:
+        """Available numbers for PowerStream."""
+
+        return [
+            PowerEntity(
+                api,
+                self,
+                "iot.permanentWatts",
+                min_value=0,
+                max_value=800,
+                command=lambda value: {
+                    "cmdCode": "WN511_SET_PERMANENT_WATTS_PACK",
+                    "params": {"permanentWatts": value * 10},
+                },
+            ),
+            BatteryLevelEntity(
+                api,
+                self,
+                "iot.lowerLimit",
+                min_value=1,
+                max_value=30,
+                command=lambda value: {
+                    "cmdCode": "WN511_SET_BAT_LOWER_PACK",
+                    "params": {"lowerLimit": value},
+                },
+            ),
+            BatteryLevelEntity(
+                api,
+                self,
+                "iot.upperLimit",
+                min_value=70,
+                max_value=100,
+                command=lambda value: {
+                    "cmdCode": "WN511_SET_BAT_UPPER_PACK",
+                    "params": {"upperLimit": value},
+                },
+            ),
+            BrightnessEntity(
+                api,
+                self,
+                "iot.invBrightness",
+                min_value=0,
+                max_value=100,
+                command=lambda value: {
+                    "cmdCode": "WN511_SET_BRIGHTNESS_PACK",
+                    "params": {"brightness": round((value * 1023) / 100)},
+                },
+            ),
         ]
 
     # def datetimes(...)..

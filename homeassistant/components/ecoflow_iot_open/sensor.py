@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from datetime import datetime, timedelta
 from functools import cached_property
 import json
@@ -29,13 +29,14 @@ from homeassistant.const import (
     UnitOfTemperature,
     UnitOfTime,
 )
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 
+from .api import EcoFlowIoTOpenAPIInterface
 from .const import (
+    API_CLIENT,
     ATTR_STATUS_DATA_LAST_UPDATE,
     ATTR_STATUS_LAST_UPDATE,
     ATTR_STATUS_PHASE,
@@ -45,7 +46,7 @@ from .const import (
     DOMAIN,
     PRODUCTS,
 )
-from .data_holder import EcoFlowIoTOpenDataHolder
+from .entities import EcoFlowBaseEntity
 from .products import BaseDevice, ProductType
 
 
@@ -57,7 +58,7 @@ async def async_setup_entry(
     """Set up sensors based on a config entry."""
 
     # client: EcoFlowIoTOpenAPIInterface = hass.data[DOMAIN][API_CLIENT][entry.entry_id]
-    data_holder: EcoFlowIoTOpenDataHolder = hass.data[DOMAIN]["data_holder"][
+    api: EcoFlowIoTOpenAPIInterface = hass.data[DOMAIN][API_CLIENT][
         config_entry.entry_id
     ]
     products: dict[ProductType, dict[str, BaseDevice]] = hass.data[DOMAIN][PRODUCTS][
@@ -67,29 +68,20 @@ async def async_setup_entry(
     sensors: list = []
     for devices in products.values():
         for device in devices.values():
-            sensors.extend(
-                device.sensors(data_holder)
-                # EcoFlowIoTOpenSensor(client, device, sensorEntityDescription)
-                # for sensorEntityDescription in device.sensors()
-            )
-            # sensors.extend(
-            #     EcoFlowIoTOpenSensor(device, description)
-            #     for description in SENSOR_TYPES
-            #     if getattr(device, description.key, False) is not False
-            # )
+            sensors.extend(device.sensors(api))
 
     if sensors:
         async_add_entities(sensors)
 
 
-class BaseSensorEntity(SensorEntity):
-    """Define a base EcoFlow Iot Open entity."""
+class BaseSensorEntity(SensorEntity, EcoFlowBaseEntity):
+    """Base sensor entity."""
 
     _attr_should_poll = False
 
     def __init__(
         self,
-        dataHolder: EcoFlowIoTOpenDataHolder,
+        api: EcoFlowIoTOpenAPIInterface,
         device: Any,  # dict[str, Any],
         mqtt_key: str,
         title: str = "",
@@ -97,20 +89,10 @@ class BaseSensorEntity(SensorEntity):
         auto_enable: bool = False,
     ) -> None:
         """Initialize."""
-        # self._attr_name = device.device_name
-        # self._attr_name = title
-        # self._attr_unique_id = f"{device.serial_number}_{device.device_name}"
-        # self._attr_unique_id = self.gen_unique_id(device.serial_number, mqtt_key)
+        super().__init__(api, device, mqtt_key, title, enabled, auto_enable)
 
         # self.entity_description = description
-        if title == "":
-            title = mqtt_key
 
-        self._attr_name = (
-            f"{title}"
-            # f"{device.device_name} {title}"
-            # f"{device.device_name}_{mqtt_key}"
-        )
         if mqtt_key in (
             "bmsMaster.cellTemp",
             "bmsMaster.cellVol",
@@ -125,89 +107,12 @@ class BaseSensorEntity(SensorEntity):
         else:
             unique_id = f"{device.serial_number}_{mqtt_key}"
         self._attr_unique_id = unique_id
-        self._auto_enable = auto_enable
-        self._attr_entity_registry_enabled_default = enabled
-        self._dataHolder = dataHolder
-        self._device = device
-        self._mqtt_key = mqtt_key
-        self._update_callback: Callable[[], None] | None = None
-        self.__attributes_mapping: dict[str, str] = {}
-        self.__attrs = OrderedDict[str, Any]()
-
-    def attr(
-        self, mqtt_key: str, title: str = "", default: Any = None
-    ) -> BaseSensorEntity:
-        """Add attribute to entity."""
-        if title == "":
-            title = mqtt_key
-        self.__attributes_mapping[mqtt_key] = title
-        self.__attrs[title] = default
-        return self
-
-    @staticmethod
-    def gen_unique_id(sn: str, key: str):
-        """Generate unique id for entity."""
-        return "ecoflow-" + sn + "-" + key.replace(".", "-").replace("_", "-")
-
-    async def async_added_to_hass(self) -> None:
-        """Subscribe to device events."""
-        await super().async_added_to_hass()
-        disposableBase = self._dataHolder.params_observable().subscribe(self._updated)
-        self.async_on_remove(disposableBase.dispose)
-
-        # self.async_on_remove(
-        #     async_dispatcher_connect(self.hass, PUSH_UPDATE, self.on_update_received)
-        # )
-
-    def _updated(self, data: dict[str, Any]):
-        """Update attributes and values."""
-        if data.get(self._device.serial_number):
-            # update attributes
-            for key, title in self.__attributes_mapping.items():
-                if key in data:
-                    self.__attrs[title] = data[key]
-
-            # update value
-            if self._mqtt_key in data[self._device.serial_number]:
-                self._attr_available = True
-                if self._auto_enable:
-                    self._attr_entity_registry_enabled_default = True
-
-                if self._update_value(data[self._device.serial_number][self._mqtt_key]):
-                    self.schedule_update_ha_state()
 
     def _update_value(self, val: Any) -> bool:
         if self._attr_native_value != val:
             self._attr_native_value = val
             return True
         return False
-
-    # def _update_value(self, val: Any) -> bool:
-    #     return False
-
-    @callback
-    def on_update_received(self) -> None:
-        """Update was pushed from the EcoFlow API."""
-        self.schedule_update_ha_state()
-
-    # @cached_property
-    # def available(self) -> bool:
-    #     """Return if the device is online or not."""
-    #     return self._EcoFlowIotOpen.online
-
-    @cached_property
-    def device_info(self) -> DeviceInfo:
-        """Return device registry information for this entity."""
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._device.serial_number)},
-            manufacturer="EcoFlow",
-            name=self._device.device_name,
-            model=self._device.model,
-        )
-
-    def set_update_callback(self, update_callback: Callable[[], None]) -> None:
-        """Set callback to run when state changes."""
-        self._update_callback = update_callback
 
 
 class BatterySensorEntity(BaseSensorEntity):
@@ -220,7 +125,7 @@ class BatterySensorEntity(BaseSensorEntity):
 
     def __init__(
         self,
-        dataHolder: EcoFlowIoTOpenDataHolder,
+        api: EcoFlowIoTOpenAPIInterface,
         device: Any,
         mqtt_key: str,
         list_position: int | None = None,
@@ -237,7 +142,7 @@ class BatterySensorEntity(BaseSensorEntity):
         ):
             title = str(list_position) + "-" + mqtt_key2
 
-        super().__init__(dataHolder, device, mqtt_key, title, enabled, auto_enable)
+        super().__init__(api, device, mqtt_key, title, enabled, auto_enable)
         self._list_position = list_position
         self._mqtt_key2 = mqtt_key2
 
@@ -318,17 +223,17 @@ class CurrentSensorEntity(BaseSensorEntity):
 
     def __init__(
         self,
-        dataHolder: EcoFlowIoTOpenDataHolder,
+        api: EcoFlowIoTOpenAPIInterface,
         device,
         key: str,
         unit=UnitOfElectricCurrent.AMPERE,
     ) -> None:
         """Initialize with unit for ampere and default to ampere."""
-        self.dataHolder = dataHolder
+        self._api = api
         self.device = device
         self.key = key
         self._attr_native_unit_of_measurement = unit
-        super().__init__(dataHolder, device, key)
+        super().__init__(api, device, key)
 
     def _update_value(self, val: Any) -> bool:
         if self._attr_native_unit_of_measurement == UnitOfElectricCurrent.MILLIAMPERE:
@@ -383,17 +288,17 @@ class DurationSensorEntity(BaseSensorEntity):
 
     def __init__(
         self,
-        dataHolder: EcoFlowIoTOpenDataHolder,
+        api: EcoFlowIoTOpenAPIInterface,
         device,
         key: str,
         unit=UnitOfTime.MINUTES,
     ) -> None:
         """Initialize with unit for duration and default to minutes."""
-        self.dataHolder = dataHolder
+        self._api = api
         self.device = device
         self.key = key
         self._attr_native_unit_of_measurement = unit
-        super().__init__(dataHolder, device, key)
+        super().__init__(api, device, key)
 
 
 class EnergySensorEntity(BaseSensorEntity):
@@ -430,8 +335,22 @@ class FrequencySensorEntity(BaseSensorEntity):
     _attr_native_unit_of_measurement = UnitOfFrequency.HERTZ
     _attr_state_class = SensorStateClass.MEASUREMENT
 
+    def __init__(
+        self,
+        api: EcoFlowIoTOpenAPIInterface,
+        device: Any,
+        mqtt_key: str,
+        factor: float = 1,
+        title: str = "",
+        enabled: bool = True,
+        auto_enable: bool = False,
+    ) -> None:
+        """Initialize with factor, default is 1."""
+        super().__init__(api, device, mqtt_key, title, enabled, auto_enable)
+        self._factor = factor
+
     def _update_value(self, val: Any) -> bool:
-        return super()._update_value(int(val) / 10)
+        return super()._update_value(int(val) / self._factor)
 
 
 class IlluminanceSensorEntity(BaseSensorEntity):
@@ -533,7 +452,7 @@ class PowerSensorEntity(BaseSensorEntity):
 
     def __init__(
         self,
-        dataHolder: EcoFlowIoTOpenDataHolder,
+        api: EcoFlowIoTOpenAPIInterface,
         device: Any,
         mqtt_key: str,
         factor: float = 1,
@@ -552,7 +471,7 @@ class PowerSensorEntity(BaseSensorEntity):
         ):
             title = str(list_position) + "-" + mqtt_key2
 
-        super().__init__(dataHolder, device, mqtt_key, title, enabled, auto_enable)
+        super().__init__(api, device, mqtt_key, title, enabled, auto_enable)
         self._factor = factor
         self._value_filter = value_filter
         self._list_position = list_position
@@ -610,7 +529,7 @@ class ProductInfoDetailSensorEntity(BaseSensorEntity):
 
     def __init__(
         self,
-        dataHolder: EcoFlowIoTOpenDataHolder,
+        api: EcoFlowIoTOpenAPIInterface,
         device: Any,
         mqtt_key: str,
         list_position: int,
@@ -629,7 +548,7 @@ class ProductInfoDetailSensorEntity(BaseSensorEntity):
             _attr_state_class = SensorStateClass.MEASUREMENT
             # _attr_native_value = 0
 
-        super().__init__(dataHolder, device, mqtt_key, title, enabled, auto_enable)
+        super().__init__(api, device, mqtt_key, title, enabled, auto_enable)
         self._list_position = list_position
         self._mqtt_key2 = mqtt_key2
 
@@ -707,15 +626,15 @@ class StatusSensorEntity(BaseSensorEntity):
     CONNECT_PHASES = [3, 5, 7]
 
     def __init__(
-        self, dataHolder: EcoFlowIoTOpenDataHolder, device: Any, check_interval_sec=30
+        self, api: EcoFlowIoTOpenAPIInterface, device: Any, check_interval_sec=30
     ) -> None:
         """Initialize status sensor."""
-        super().__init__(dataHolder, device, "Status")
+        super().__init__(api, device, "Status")
         self._online = 0
         self._check_interval_sec = check_interval_sec
         self._attrs = OrderedDict[str, Any]()
         self._attrs[ATTR_STATUS_SN] = device.serial_number
-        self._attrs[ATTR_STATUS_DATA_LAST_UPDATE] = self._dataHolder.params_time()
+        self._attrs[ATTR_STATUS_DATA_LAST_UPDATE] = self._api.data_holder.params_time()
         self._attrs[ATTR_STATUS_UPDATES] = 0
         self._attrs[ATTR_STATUS_LAST_UPDATE] = None
         self._attrs[ATTR_STATUS_RECONNECTS] = 0
@@ -725,8 +644,8 @@ class StatusSensorEntity(BaseSensorEntity):
         """Subscribe to device events."""
         await super().async_added_to_hass()
 
-        # disposableBase = self._dataHolder.params_observable().subscribe(self._updated)
-        params_d = self._dataHolder.params_observable().subscribe(self._updated)
+        # disposableBase = self._data_holder.params_observable().subscribe(self._updated)
+        params_d = self._api.data_holder.params_observable().subscribe(self._updated)
         self.async_on_remove(params_d.dispose)
 
         self.async_on_remove(
@@ -738,11 +657,11 @@ class StatusSensorEntity(BaseSensorEntity):
         )
 
         self._update_status(
-            (dt_util.utcnow() - self._dataHolder.params_time()).total_seconds()
+            (dt_util.utcnow() - self._api.data_holder.params_time()).total_seconds()
         )
 
     def __check_status(self, now: datetime):
-        data_outdated_sec = (now - self._dataHolder.params_time()).total_seconds()
+        data_outdated_sec = (now - self._api.data_holder.params_time()).total_seconds()
         phase = math.ceil(data_outdated_sec / self._check_interval_sec)
         self._attrs[ATTR_STATUS_PHASE] = phase
         time_to_reconnect = phase in self.CONNECT_PHASES
@@ -772,7 +691,7 @@ class StatusSensorEntity(BaseSensorEntity):
         #     self.schedule_update_ha_state()
 
     def _updated(self, data: dict[str, Any]):
-        self._attrs[ATTR_STATUS_DATA_LAST_UPDATE] = self._dataHolder.params_time()
+        self._attrs[ATTR_STATUS_DATA_LAST_UPDATE] = self._api.data_holder.params_time()
         if self._online == 0:
             self._update_status(0)
 
@@ -807,7 +726,7 @@ class TemperateSensorEntity(BaseSensorEntity):
 
     def __init__(
         self,
-        dataHolder: EcoFlowIoTOpenDataHolder,
+        api: EcoFlowIoTOpenAPIInterface,
         device: Any,
         mqtt_key: str,
         factor: float = 1,
@@ -820,7 +739,7 @@ class TemperateSensorEntity(BaseSensorEntity):
         if isinstance(list_position, int) and title == "":
             title = mqtt_key + "-" + str(list_position).zfill(2)
 
-        super().__init__(dataHolder, device, mqtt_key, title, enabled, auto_enable)
+        super().__init__(api, device, mqtt_key, title, enabled, auto_enable)
         self._list_position = list_position
         self._factor = factor
 
@@ -863,7 +782,7 @@ class VoltageSensorEntity(BaseSensorEntity):
 
     def __init__(
         self,
-        dataHolder: EcoFlowIoTOpenDataHolder,
+        api: EcoFlowIoTOpenAPIInterface,
         device: Any,
         mqtt_key: str,
         list_position: int | None = None,
@@ -875,7 +794,7 @@ class VoltageSensorEntity(BaseSensorEntity):
         if isinstance(list_position, int) and title == "":
             title = mqtt_key + "-" + str(list_position).zfill(2)
 
-        super().__init__(dataHolder, device, mqtt_key, title, enabled, auto_enable)
+        super().__init__(api, device, mqtt_key, title, enabled, auto_enable)
         self._list_position = list_position
 
     def _update_value(self, val: Any) -> bool:

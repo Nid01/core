@@ -20,7 +20,6 @@ from .const import (
     PRODUCTS,
     ProductType,
 )
-from .data_holder import EcoFlowIoTOpenDataHolder
 from .errors import (
     ClientError,
     EcoFlowIoTOpenError,
@@ -31,7 +30,11 @@ from .errors import (
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.SENSOR]
+PLATFORMS: list[Platform] = [
+    Platform.NUMBER,
+    Platform.SENSOR,
+    Platform.SWITCH,
+]
 PUSH_UPDATE = "ecoflow_iot_open.push_update"
 
 INTERVAL = timedelta(minutes=60)
@@ -41,13 +44,13 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     """Set up EcoFlow IoT Open from a config entry."""
 
     try:
-        data_holder = EcoFlowIoTOpenDataHolder()
-        api = await EcoFlowIoTOpenAPIInterface.certification(
+        api = EcoFlowIoTOpenAPIInterface(
+            hass,
             config_entry.data[CONF_ACCESS_KEY],
             config_entry.data[CONF_SECRET_KEY],
             config_entry.data[CONF_BASE_URL],
-            data_holder,
         )
+        await api.certification()
     except (InvalidCredentialsError, KeyError):
         _LOGGER.error("Invalid credentials provided")
         return False
@@ -69,7 +72,6 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     hass.data.setdefault(DOMAIN, {API_CLIENT: {}, PRODUCTS: {}, DATA_HOLDER: {}})
     hass.data[DOMAIN][API_CLIENT][config_entry.entry_id] = api
     hass.data[DOMAIN][PRODUCTS][config_entry.entry_id] = products
-    hass.data[DOMAIN][DATA_HOLDER][config_entry.entry_id] = data_holder
 
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
 

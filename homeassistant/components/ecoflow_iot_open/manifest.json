@@ -7,7 +7,7 @@
   "documentation": "https://www.home-assistant.io/integrations/ecoflow_iot_open",
   "homekit": {},
   "iot_class": "cloud_push",
-  "requirements": [],
+  "requirements": ["aiomqtt==2.0.1", "reactivex==4.0.4"],
   "ssdp": [],
   "zeroconf": []
 }
