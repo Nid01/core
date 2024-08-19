@@ -46,11 +46,7 @@ from .errors import (
     InvalidCredentialsError,
     InvalidResponseFormat,
 )
-from .products import ProductType
-from .products.delta_max import DELTAMax
-from .products.powerstream import PowerStream
-from .products.single_axis_solar_tracker import SingleAxisSolarTracker
-from .products.smart_plug import SmartPlug
+from .products import BaseDevice, ProductType
 
 _LOGGER = logging.getLogger(__name__)
 _CLIENT_LOGGER = logging.getLogger(f"{__name__}.client")
@@ -104,14 +100,15 @@ class EcoFlowIoTOpenAPIInterface:
 
     def __init__(
         self,
+        hass: HomeAssistant,
         accessKey: str,
         secretKey: str,
         base_url: str,
-        data_holder: Optional[EcoFlowIoTOpenDataHolder] = None,
     ) -> None:
         """Initialize an EcoFlowIoTOpenAPIInterface instance.
 
         Args:
+            hass (HomeAssistant): Root object of the Home Assistant home automation.
             accessKey (str): Access key for authentication.
             secretKey (str): Secret key for authentication.
             base_url (str): Base URL for the API.
@@ -128,6 +125,7 @@ class EcoFlowIoTOpenAPIInterface:
             _data_holder (Optional[EcoFlowIoTOpenDataHolder]): Holder for EcoFlow IoT Open data.
 
         """
+        self.hass = hass
         self._accessKey = accessKey
         self._secretKey = secretKey
         self._base_url = base_url
@@ -135,18 +133,13 @@ class EcoFlowIoTOpenAPIInterface:
         self._products: dict[ProductType, dict[str, Any]] = {}
         self._mqtt_client: Client
         self._mqtt_listener: Optional[asyncio.Task] = None
-        self._data_holder = data_holder
+        self.data_holder = EcoFlowIoTOpenDataHolder()
         self._reconnects = 0
         self._max_reconnects = 3
 
-    @classmethod
     async def certification(
-        cls: type[ApiType],
-        accessKey: str,
-        secretKey: str,
-        base_url: str,
-        data_holder: Optional[EcoFlowIoTOpenDataHolder] = None,
-    ) -> ApiType:
+        self,
+    ) -> None:
         """Class method for creating a certified EcoFlowIoTOpenAPIInterface instance.
 
         Args:
@@ -160,9 +153,7 @@ class EcoFlowIoTOpenAPIInterface:
             ApiType: Certified EcoFlowIoTOpenAPIInterface instance.
 
         """
-        this_class = cls(accessKey, secretKey, base_url, data_holder)
-        await this_class._authenticate()
-        return this_class
+        await self._authenticate()
 
     async def _process_device(
         self,
@@ -213,7 +204,7 @@ class EcoFlowIoTOpenAPIInterface:
 
     def _create_product_instance(
         self, product_type: ProductType, device: dict[str, Any]
-    ) -> Any:
+    ) -> BaseDevice:
         """Create an instance of a specific product type.
 
         Args:
@@ -224,6 +215,12 @@ class EcoFlowIoTOpenAPIInterface:
             Any: Instance of the specified product type.
 
         """
+        # pylint: disable=import-outside-toplevel
+        from .products.delta_max import DELTAMax
+        from .products.powerstream import PowerStream
+        from .products.single_axis_solar_tracker import SingleAxisSolarTracker
+        from .products.smart_plug import SmartPlug
+
         if product_type == ProductType.DELTA_MAX:
             return DELTAMax(device, self)
         if product_type == ProductType.SINGLE_AXIS_SOLAR_TRACKER:
@@ -232,8 +229,10 @@ class EcoFlowIoTOpenAPIInterface:
             return PowerStream(device, self)
         if product_type == ProductType.SMART_PLUG:
             return SmartPlug(device, self)
+
+        raise EcoFlowIoTOpenError("Unknown Device")
         # To-Do: Return diagnostic/base product instance in case of unknown prefix.
-        return None
+        # return None
 
     async def get_devices_by_product(
         self, product_types: list[ProductType]
@@ -282,7 +281,7 @@ class EcoFlowIoTOpenAPIInterface:
             _LOGGER.warning("MQTT listener is already running")
             return
         self._reconnects = 0
-        self._mqtt_listener = asyncio.create_task(self.subscribe(hass, config_entry))
+        self._mqtt_listener = asyncio.create_task(self.subscribe(config_entry))
 
     async def disconnect(self):
         """Disconnect from the MQTT broker."""
@@ -296,7 +295,7 @@ class EcoFlowIoTOpenAPIInterface:
         else:
             _LOGGER.warning("MQTT listener is not running")
 
-    async def subscribe(self, hass: HomeAssistant, config_entry: ConfigEntry):
+    async def subscribe(self, config_entry: ConfigEntry):
         """Subscribe to MQTT topics."""
         if not self._products:
             _LOGGER.error("No products found. Did you call setup before subscribing?")
@@ -316,6 +315,7 @@ class EcoFlowIoTOpenAPIInterface:
                         cert_reqs=ssl.CERT_REQUIRED,
                     ),
                 ) as client:
+                    self._mqtt_client = client
                     topics_qos: list[tuple[str, int]] = [
                         (
                             f"/open/{self._certification["certificateAccount"]}/{device.serial_number}/status",
@@ -332,8 +332,8 @@ class EcoFlowIoTOpenAPIInterface:
                         for devices in self._products.values()
                         for device in devices.values()
                     ]
-                    await client.subscribe(topics_qos)
-                    async for message in client.messages:
+                    await self._mqtt_client.subscribe(topics_qos)
+                    async for message in self._mqtt_client.messages:
                         if isinstance(message.payload, bytes):
                             await self._handle_mqtt_message(message)
 
@@ -345,7 +345,7 @@ class EcoFlowIoTOpenAPIInterface:
                 )
                 if self._reconnects == self._max_reconnects:
                     async_create_issue(
-                        hass,
+                        self.hass,
                         DOMAIN,
                         DOMAIN + "_mqtt_connection",
                         is_fixable=True,
@@ -357,6 +357,48 @@ class EcoFlowIoTOpenAPIInterface:
                             "exception": f"[ReasonCode: {exception.rc}] {exception.args}"
                         },
                     )
+
+    async def publish(
+        self,
+        serial_number: str,
+        command: dict,
+    ):
+        """Subscribe to MQTT topics."""
+
+        message_id = random.randint(100000, 999999)
+        payload: dict[str, str | int] = {
+            "id": message_id,
+            "version": "1.0",
+        }
+        payload.update(command)
+
+        # try:
+        await self._mqtt_client.publish(
+            f"/open/{self._certification["certificateAccount"]}/{serial_number}/set",
+            json.dumps(payload),
+            1,
+        )
+
+        # except MqttCodeError as exception:
+        #     self._reconnects = self._reconnects + 1
+        #     _LOGGER.exception(
+        #         "Exception during subscription. %s reconnects left",
+        #         self._max_reconnects - self._reconnects,
+        #     )
+        #     if self._reconnects == self._max_reconnects:
+        #         async_create_issue(
+        #             hass,
+        #             DOMAIN,
+        #             DOMAIN + "_mqtt_connection",
+        #             is_fixable=True,
+        #             issue_domain=DOMAIN,
+        #             severity=IssueSeverity.ERROR,
+        #             translation_key="mqtt_connection",
+        #             data={"entry_id": config_entry.entry_id},
+        #             translation_placeholders={
+        #                 "exception": f"[ReasonCode: {exception.rc}] {exception.args}"
+        #             },
+        #         )
 
     async def _handle_mqtt_message(self, message):
         """Handle incoming MQTT messages.
@@ -381,8 +423,8 @@ class EcoFlowIoTOpenAPIInterface:
                     f"{addr}.{key}": value
                     for key, value in unpacked_json["params"].items()
                 }
-            if isinstance(self._data_holder, EcoFlowIoTOpenDataHolder):
-                self._data_holder.update_params(
+            if isinstance(self.data_holder, EcoFlowIoTOpenDataHolder):
+                self.data_holder.update_params(
                     raw=unpacked_json["params"], serial_number=serial_number
                 )
         else:
@@ -418,11 +460,11 @@ class EcoFlowIoTOpenAPIInterface:
 
     async def initializeDevices(self) -> None:
         """Initialize devices and updates data holder."""
-        if isinstance(self._data_holder, EcoFlowIoTOpenDataHolder):
+        if isinstance(self.data_holder, EcoFlowIoTOpenDataHolder):
             for devices in self._products.values():
                 for device in devices.values():
                     quota_data = await self.getDeviceQuota(device.serial_number)
-                    self._data_holder.update_params(
+                    self.data_holder.update_params(
                         raw=quota_data, serial_number=device.serial_number
                     )
         else:

@@ -3,10 +3,8 @@
 from unittest.mock import AsyncMock, patch
 
 from homeassistant import config_entries
-from homeassistant.components.ecoflow_iot_open.config_flow import (
-    CannotConnect,
-    InvalidAuth,
-)
+from homeassistant.auth.providers.homeassistant import InvalidAuth
+from homeassistant.components.august.exceptions import CannotConnect
 from homeassistant.components.ecoflow_iot_open.const import DOMAIN
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant

@@ -2,10 +2,12 @@
 
 from collections.abc import Sequence
 
+from homeassistant.components.number import NumberEntity
 from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import UnitOfElectricCurrent, UnitOfTime
 
-from ..api import EcoFlowIoTOpenDataHolder
+from ..api import EcoFlowIoTOpenAPIInterface
 from ..sensor import (
     BatterySensorEntity,
     BinaryStateSensorEntity,
@@ -19,7 +21,7 @@ from ..sensor import (
     EnergyStorageSensorEntity,
     PowerSensorEntity,
     ProductInfoDetailSensorEntity,
-    StatusSensorEntity,
+    # StatusSensorEntity,
     TemperateSensorEntity,
     VoltageSensorEntity,
 )
@@ -35,7 +37,7 @@ class DELTAMax(BaseDevice):
         self._model = "DELTA Max"
         # self._client: EcoFlowIoTOpenAPIInterface
 
-    def sensors(self, dataHolder: EcoFlowIoTOpenDataHolder) -> Sequence[SensorEntity]:
+    def sensors(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[SensorEntity]:
         """Available sensors for DELTA Max."""
 
         device_info_keys = set(self._device_info.keys())
@@ -50,7 +52,7 @@ class DELTAMax(BaseDevice):
                     for index in range(len(self._device_info[cell_key]))
                 ]
                 cell_sensors = [
-                    SensorEntityClass(dataHolder, self, key[0], list_position=key[1])
+                    SensorEntityClass(api, self, key[0], list_position=key[1])
                     for key in cell_keys
                 ]
                 sensors.extend(cell_sensors)
@@ -78,7 +80,7 @@ class DELTAMax(BaseDevice):
         ]
 
         battery_sensors = [
-            BatterySensorEntity(dataHolder, self, key)
+            BatterySensorEntity(api, self, key)
             for key in battery_keys
             if key in device_info_keys
         ]
@@ -88,7 +90,7 @@ class DELTAMax(BaseDevice):
         ]
 
         binary_state_sensors = [
-            BinaryStateSensorEntity(dataHolder, self, key)
+            BinaryStateSensorEntity(api, self, key)
             for key in binary_state_keys
             if key in device_info_keys
         ]
@@ -98,7 +100,7 @@ class DELTAMax(BaseDevice):
         ]
 
         brightness_sensors = [
-            BrightnessSensorEntity(dataHolder, self, key)
+            BrightnessSensorEntity(api, self, key)
             for key in brightness_keys
             if key in device_info_keys
         ]
@@ -109,7 +111,7 @@ class DELTAMax(BaseDevice):
         ]
 
         charging_state_sensors = [
-            ChargingStateSensorEntity(dataHolder, self, key)
+            ChargingStateSensorEntity(api, self, key)
             for key in charging_state_keys
             if key in device_info_keys
         ]
@@ -136,7 +138,7 @@ class DELTAMax(BaseDevice):
 
         current_sensors = [
             CurrentSensorEntity(
-                dataHolder,
+                api,
                 self,
                 key,
                 current_units.get(key, UnitOfElectricCurrent.AMPERE),
@@ -151,7 +153,7 @@ class DELTAMax(BaseDevice):
         ]
 
         cycles_sensors = [
-            CyclesSensorEntity(dataHolder, self, key)
+            CyclesSensorEntity(api, self, key)
             for key in cycles_keys
             if key in device_info_keys
         ]
@@ -165,7 +167,7 @@ class DELTAMax(BaseDevice):
         ]
 
         energy_sensors = [
-            EnergySensorEntity(dataHolder, self, key)
+            EnergySensorEntity(api, self, key)
             for key in energy_keys
             if key in device_info_keys
         ]
@@ -180,7 +182,7 @@ class DELTAMax(BaseDevice):
         ]
 
         energy_storage_sensors = [
-            EnergyStorageSensorEntity(dataHolder, self, key)
+            EnergyStorageSensorEntity(api, self, key)
             for key in energy_storage_keys
             if key in device_info_keys
         ]
@@ -209,7 +211,7 @@ class DELTAMax(BaseDevice):
 
         duration_sensors = [
             DurationSensorEntity(
-                dataHolder,
+                api,
                 self,
                 key,
                 duration_units.get(key, UnitOfTime.MINUTES),
@@ -252,7 +254,7 @@ class DELTAMax(BaseDevice):
 
         power_sensors = [
             PowerSensorEntity(
-                dataHolder,
+                api,
                 self,
                 key,
                 power_factors.get(key, 1),
@@ -287,7 +289,7 @@ class DELTAMax(BaseDevice):
         ]
 
         temperature_sensors = [
-            TemperateSensorEntity(dataHolder, self, key)
+            TemperateSensorEntity(api, self, key)
             for key in temperature_keys
             if key in device_info_keys
         ]
@@ -326,7 +328,7 @@ class DELTAMax(BaseDevice):
         ]
 
         voltage_sensors = [
-            VoltageSensorEntity(dataHolder, self, key)
+            VoltageSensorEntity(api, self, key)
             for key in voltage_keys
             if key in device_info_keys
         ]
@@ -355,7 +357,7 @@ class DELTAMax(BaseDevice):
                 for detail_key in detail_keys
             ]
             product_info_detail_sensors = [
-                ProductInfoDetailSensorEntity(dataHolder, self, key[0], key[1], key[2])
+                ProductInfoDetailSensorEntity(api, self, key[0], key[1], key[2])
                 for key in product_info_detail_keys
             ]
 
@@ -364,6 +366,7 @@ class DELTAMax(BaseDevice):
             "bmsSlave1.cellTemp",
             "bmsMaster.cellVol",
             "bmsSlave1.cellVol",
+            "pd.beepMode",
             # icons
             "pd.iconAcFreqMode",
             "pd.iconAcFreqState",
@@ -450,7 +453,7 @@ class DELTAMax(BaseDevice):
         diagnostic_keys = device_info_keys - found_string_keys
 
         diagnostic_sensors = [
-            DiagnosticSensorEntity(dataHolder, self, key, enabled=False)
+            DiagnosticSensorEntity(api, self, key, enabled=False)
             for key in diagnostic_keys
         ]
 
@@ -467,7 +470,29 @@ class DELTAMax(BaseDevice):
             *energy_storage_sensors,
             *power_sensors,
             *product_info_detail_sensors,
-            StatusSensorEntity(dataHolder, self),
+            # StatusSensorEntity(api, self),
             *temperature_sensors,
             *voltage_sensors,
         ]
+
+    def switches(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[SwitchEntity]:
+        """Available switches for DELTA Max."""
+
+        return [
+            # parameters are not identical between Delta2Max and not documented DeltaMax
+            # BaseSwitchEntity(
+            #     api,
+            #     self,
+            #     "pd.beepMode",
+            #     command=lambda value: {
+            #         "moduleType": 1,
+            #         "operateType": "quietCfg",
+            #         "params": {"enabled": value},
+            #     },  # type: ignore
+            # )
+        ]
+
+    def numbers(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[NumberEntity]:
+        """Available numbers for DELTA Max."""
+
+        return []

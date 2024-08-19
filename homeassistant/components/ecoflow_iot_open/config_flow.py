@@ -56,9 +56,13 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
         return errors
 
     try:
-        await EcoFlowIoTOpenAPIInterface.certification(
-            data[CONF_ACCESS_KEY], data[CONF_SECRET_KEY], data[CONF_BASE_URL], None
+        api = EcoFlowIoTOpenAPIInterface(
+            hass,
+            data[CONF_ACCESS_KEY],
+            data[CONF_SECRET_KEY],
+            data[CONF_BASE_URL],
         )
+        await api.certification()
 
     except ClientError:
         _LOGGER.debug("Cannot connect", exc_info=True)

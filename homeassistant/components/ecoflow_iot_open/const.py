@@ -7,6 +7,7 @@ API_CLIENT = "api_client"
 DATA_HOLDER = "data_holder"
 PRODUCTS = "products"
 DEVICES = "devices"
+ECOFLOW = "EcoFlow"
 
 
 CONF_ACCESS_KEY = "accessKey"
