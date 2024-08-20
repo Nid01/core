@@ -11,6 +11,7 @@ import math
 from typing import Any
 
 from homeassistant.components.sensor import (
+    DOMAIN as SENSOR_DOMAIN,
     SensorDeviceClass,
     SensorEntity,
     SensorStateClass,
@@ -90,6 +91,10 @@ class BaseSensorEntity(SensorEntity, EcoFlowBaseEntity):
     ) -> None:
         """Initialize."""
         super().__init__(api, device, mqtt_key, title, enabled, auto_enable)
+        if title != "":
+            self.entity_id = f"{SENSOR_DOMAIN}.{device.device_name.replace(' ', '_').replace('-', '_').replace('.', '_')}_{title}"
+        else:
+            self.entity_id = f"{SENSOR_DOMAIN}.{device.device_name.replace(' ', '_').replace('-', '_').replace('.', '_')}_{mqtt_key}"
 
         # self.entity_description = description
 
