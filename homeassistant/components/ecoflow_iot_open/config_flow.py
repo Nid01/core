@@ -9,8 +9,13 @@ from aiohttp import ClientError
 import voluptuous as vol
 
 from homeassistant.auth import InvalidAuthError
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
-from homeassistant.core import HomeAssistant
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
+from homeassistant.core import HomeAssistant, callback
 
 from .api import EcoFlowIoTOpenAPIInterface
 from .const import (
@@ -18,10 +23,12 @@ from .const import (
     CONF_BASE_URL,
     CONF_SECRET_KEY,
     CONF_SERVER_REGION,
+    DEFAULT_AVAILABILITY_CHECK_INTERVAL_SEC,
     DESCRIPTION_ACCESS_KEY,
     DESCRIPTION_SECRET_KEY,
     DESCRIPTION_SERVER_REGION,
     DOMAIN,
+    OPTS_AVAILABILITY_CHECK_INTERVAL_SEC,
 )
 from .errors import CannotConnect, InvalidCredentialsError
 
@@ -36,7 +43,6 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
         vol.Required(CONF_SECRET_KEY, description=DESCRIPTION_SECRET_KEY): str,
         vol.Required(
             CONF_SERVER_REGION,
-            default=DEFAULT_SERVER,
             description=DESCRIPTION_SERVER_REGION,
         ): vol.In(SERVER_CHOICES),
     }
@@ -103,8 +109,57 @@ class EcoFlowIoTOpenConfigFlow(ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
             else:
-                return self.async_create_entry(title=info["title"], data=user_input)
+                options = {
+                    OPTS_AVAILABILITY_CHECK_INTERVAL_SEC: DEFAULT_AVAILABILITY_CHECK_INTERVAL_SEC
+                }
+
+                return self.async_create_entry(
+                    title=info["title"], data=user_input, options=options
+                )
 
         return self.async_show_form(
             step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
+        )
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
+        """Options callback for EcoFlow IoT Open."""
+        return EcoflowOptionsFlow(config_entry)
+
+
+class EcoflowOptionsFlow(OptionsFlow):
+    """Handle EcoFlow IoT Open options."""
+
+    def __init__(self, config_entry: ConfigEntry) -> None:
+        """Initialize EcoFlow IoT Open options flow."""
+        self.config_entry = config_entry
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Manage the options."""
+        if user_input is not None:
+            changed = self.hass.config_entries.async_update_entry(
+                entry=self.config_entry,
+                data=self.config_entry.data,
+                options=user_input,
+            )
+            if changed:
+                await self.hass.config_entries.async_reload(self.config_entry.entry_id)
+            return self.async_create_entry(title="", data=user_input)
+
+        return self.async_show_form(
+            step_id="init",
+            last_step=True,
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        OPTS_AVAILABILITY_CHECK_INTERVAL_SEC,
+                        default=self.config_entry.options[
+                            OPTS_AVAILABILITY_CHECK_INTERVAL_SEC
+                        ],
+                    ): int,
+                }
+            ),
         )

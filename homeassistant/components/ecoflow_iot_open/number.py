@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from functools import cached_property
 from typing import Any
 
 from homeassistant.components.number import (
@@ -52,7 +53,7 @@ class BaseNumberEntity(NumberEntity, EcoFlowBaseCommandEntity):
     def __init__(
         self,
         api: EcoFlowIoTOpenAPIInterface,
-        device: Any,  # dict[str, Any],
+        device: BaseDevice,
         mqtt_key: str,
         min_value: int,
         max_value: int,
@@ -98,7 +99,7 @@ class BatteryLevelEntity(LevelEntity):
 
     _attr_icon = "battery-charging-100"
 
-    @property  # @cached_property
+    @cached_property
     def icon(self) -> str:
         """Icon for battery level."""
         if isinstance(self.state, int):
@@ -120,7 +121,7 @@ class BrightnessEntity(LevelEntity):
     def _update_value(self, val: Any) -> bool:
         return super()._update_value(round(max(0, min(100, val / 1023 * 100))))
 
-    @property  # @cached_property
+    @cached_property
     def icon(self) -> str:
         """Icon for brightness level."""
         if isinstance(self.state, int):

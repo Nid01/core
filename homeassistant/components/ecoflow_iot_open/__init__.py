@@ -17,6 +17,7 @@ from .const import (
     CONF_SECRET_KEY,
     DATA_HOLDER,
     DOMAIN,
+    OPTS_AVAILABILITY_CHECK_INTERVAL_SEC,
     PRODUCTS,
     ProductType,
 )
@@ -49,6 +50,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
             config_entry.data[CONF_ACCESS_KEY],
             config_entry.data[CONF_SECRET_KEY],
             config_entry.data[CONF_BASE_URL],
+            config_entry.options[OPTS_AVAILABILITY_CHECK_INTERVAL_SEC],
         )
         await api.certification()
     except (InvalidCredentialsError, KeyError):
