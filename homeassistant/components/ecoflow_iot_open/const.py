@@ -18,6 +18,10 @@ CONF_SERVER_REGION = "server region"
 CONF_BASE_URL = "base url"
 DESCRIPTION_SERVER_REGION = "Select the server region."
 
+OPTS_AVAILABILITY_CHECK_INTERVAL_SEC = "availability_check_interval_sec"
+
+DEFAULT_AVAILABILITY_CHECK_INTERVAL_SEC = 15
+
 DELTA_MAX = "DAEB"  # productType = 13
 # Potentially setup DELTA_MAX_SMART_EXTRA_BATTERY as separate device?
 # DELTA_MAX_SMART_EXTRA_BATTERY = "E2AB"  # productType=13

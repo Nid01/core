@@ -18,6 +18,7 @@ Constants:
 """
 
 import asyncio
+from datetime import UTC, datetime
 import hashlib
 import hmac
 import json
@@ -38,7 +39,14 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import DOMAIN as HA_DOMAIN, HomeAssistant
 from homeassistant.helpers.issue_registry import IssueSeverity, async_create_issue
 
-from .const import DELTA_MAX, DOMAIN, POWERSTREAM, SINGLE_AXIS_SOLAR_TRACKER, SMART_PLUG
+from .const import (
+    DEFAULT_AVAILABILITY_CHECK_INTERVAL_SEC,
+    DELTA_MAX,
+    DOMAIN,
+    POWERSTREAM,
+    SINGLE_AXIS_SOLAR_TRACKER,
+    SMART_PLUG,
+)
 from .data_holder import EcoFlowIoTOpenDataHolder
 from .errors import (
     EcoFlowIoTOpenError,
@@ -104,6 +112,7 @@ class EcoFlowIoTOpenAPIInterface:
         accessKey: str,
         secretKey: str,
         base_url: str,
+        availability_check_interval_sec: int = DEFAULT_AVAILABILITY_CHECK_INTERVAL_SEC,
     ) -> None:
         """Initialize an EcoFlowIoTOpenAPIInterface instance.
 
@@ -113,6 +122,7 @@ class EcoFlowIoTOpenAPIInterface:
             secretKey (str): Secret key for authentication.
             base_url (str): Base URL for the API.
             data_holder (Optional[EcoFlowIoTOpenDataHolder]): Holder for EcoFlow IoT Open data. Defaults to None.
+            availability_check_interval_sec (int): Interval in which the sensors of devices will be checked, if the device didn't send data updates for too long.
 
         Attributes:
             _accessKey (str): Stores the provided access key.
@@ -125,17 +135,18 @@ class EcoFlowIoTOpenAPIInterface:
             _data_holder (Optional[EcoFlowIoTOpenDataHolder]): Holder for EcoFlow IoT Open data.
 
         """
-        self.hass = hass
         self._accessKey = accessKey
-        self._secretKey = secretKey
         self._base_url = base_url
         self._certification: dict[str, Any]
-        self._products: dict[ProductType, dict[str, Any]] = {}
+        self._max_reconnects = 3
         self._mqtt_client: Client
         self._mqtt_listener: Optional[asyncio.Task] = None
-        self.data_holder = EcoFlowIoTOpenDataHolder()
+        self._products: dict[ProductType, dict[str, Any]] = {}
         self._reconnects = 0
-        self._max_reconnects = 3
+        self._secretKey = secretKey
+        self.hass = hass
+        self.data_holder = EcoFlowIoTOpenDataHolder()
+        self.availability_check_interval_sec = availability_check_interval_sec
 
     async def certification(
         self,
@@ -414,7 +425,7 @@ class EcoFlowIoTOpenAPIInterface:
         serial_number = message.topic.value.split("/")[3]
         product_type = self._get_product_type(serial_number[:4])
 
-        if product_type != ProductType.UNKNOWN:
+        if product_type not in (ProductType.UNKNOWN, None):
             if "param" in unpacked_json:
                 unpacked_json["params"] = unpacked_json.pop("param")
             if "addr" in unpacked_json:
@@ -427,6 +438,10 @@ class EcoFlowIoTOpenAPIInterface:
                 self.data_holder.update_params(
                     raw=unpacked_json["params"], serial_number=serial_number
                 )
+                self._products[product_type][serial_number].set_last_updated(
+                    datetime.now(UTC)
+                )
+
         else:
             _LOGGER.error("Device with serial number %s not found", serial_number)
 

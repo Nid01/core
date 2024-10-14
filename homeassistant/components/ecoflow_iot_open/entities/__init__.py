@@ -4,16 +4,18 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from collections.abc import Callable
+from datetime import datetime, timedelta
 from functools import cached_property
-import time
 from typing import Any
 
 from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.event import async_track_time_interval
 
 from ..api import EcoFlowIoTOpenAPIInterface
 from ..const import DOMAIN, ECOFLOW
+from ..products import BaseDevice
 
 # from ..products import EcoFlowDeviceInfo
 
@@ -26,12 +28,12 @@ class EcoFlowBaseEntity(Entity):
     def __init__(
         self,
         api: EcoFlowIoTOpenAPIInterface,
-        device: Any,  # dict[str, Any],
+        device: BaseDevice,
         mqtt_key: str,
         title: str = "",
         enabled: bool = True,
         auto_enable: bool = False,
-    ) -> None:  # object:
+    ) -> None:
         """Initialize."""
         self.hass = api.hass
 
@@ -39,7 +41,7 @@ class EcoFlowBaseEntity(Entity):
             title = mqtt_key
 
         self._api = api
-        self._attr_available = False
+        self._attr_available = device.available
         self._attr_entity_registry_enabled_default = enabled
         self._attr_name = title
         # f"{device.device_name} {title}"
@@ -58,7 +60,6 @@ class EcoFlowBaseEntity(Entity):
         )
         self._device = device
 
-        self._last_update_time: float = 0.0
         self._mqtt_key = mqtt_key
         self._update_callback: Callable[[], None] | None = None
         self.__attributes_mapping: dict[str, str] = {}
@@ -91,11 +92,29 @@ class EcoFlowBaseEntity(Entity):
         )
         self.async_on_remove(disposableBase.dispose)
 
-        # self.async_on_remove(
-        #     async_dispatcher_connect(self.hass, PUSH_UPDATE, self.on_update_received)
-        # )
+        self.async_on_remove(
+            async_track_time_interval(
+                self.hass,
+                self._check_status,
+                timedelta(seconds=self._api.availability_check_interval_sec),
+            )
+        )
 
-    def _updated(self, data: dict[str, Any]):
+    def _check_status(self, now: datetime) -> None:
+        if self._device.available:
+            time_diff = now - self._device.last_updated
+            available = time_diff <= timedelta(
+                seconds=self._api.availability_check_interval_sec * 4
+            )
+            self._attr_available = available
+            self._device.set_availability(available)
+            self.schedule_update_ha_state()
+        else:
+            self._attr_available = False
+            self._device.set_availability(False)
+            self.schedule_update_ha_state()
+
+    def _updated(self, data: dict[str, Any]) -> None:
         """Update attributes and values."""
         if data.get(self.serial_number):
             # update attributes
@@ -105,29 +124,11 @@ class EcoFlowBaseEntity(Entity):
 
             # update value
             if self._mqtt_key in data[self.serial_number]:
-                self._attr_available = True
                 if self._auto_enable:
                     self._attr_entity_registry_enabled_default = True
 
                 if self._update_value(data[self.serial_number][self._mqtt_key]):
-                    self._attr_available = True
-                    self._last_update_time = time.time()
                     self.schedule_update_ha_state()
-
-    # def update_status(self):
-    #     # if status == "online":
-    #     #     # self._attr_state = "online"
-    #     #     # self._update_value(True)
-    #     #     self._attr_available = True
-    #     # else:
-    #     #     # self._attr_state = "offline"
-    #     #     # self._update_value(False)
-    #     #     self._attr_available = False
-    #     #     self.hass = (
-    #     #         self._api._hass
-    #     #     )  # Why is self.hass None even though it has been set during __init__?
-    #     self.hass = self._api.hass
-    #     self.async_write_ha_state()
 
     def _update_value(self, val: Any) -> bool:
         return False
@@ -137,27 +138,9 @@ class EcoFlowBaseEntity(Entity):
         """Update was pushed from the EcoFlow API."""
         self.schedule_update_ha_state()
 
-    # @property
-    # @cached_property
-    # def available(self) -> bool:
-    #     """Return if the device is online or not."""
-    #     if isinstance(self._attr_device_info, dict):
-    #         return self._attr_device_info.get("status", False)
-    #     return False
-
     def set_update_callback(self, update_callback: Callable[[], None]) -> None:
         """Set callback to run when state changes."""
         self._update_callback = update_callback
-
-    # @cached_property
-    # def device_info(self) -> DeviceInfo:
-    #     """Return device registry information for this entity."""
-    #     return DeviceInfo(
-    #         identifiers={(DOMAIN, self._device.serial_number)},
-    #         manufacturer="EcoFlow",
-    #         name=self._device.device_name,
-    #         model=self._device.model,
-    #     )
 
     @cached_property
     def serial_number(self) -> str:
@@ -175,7 +158,7 @@ class EcoFlowBaseCommandEntity(EcoFlowBaseEntity):
     def __init__(
         self,
         api: EcoFlowIoTOpenAPIInterface,
-        device: Any,  # dict[str, Any],
+        device: BaseDevice,
         mqtt_key: str,
         command: Callable[[int], dict[str, Any]],
         title: str = "",

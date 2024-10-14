@@ -1,6 +1,7 @@
 """EcoFlow IoT Open switch module."""
 
 from collections.abc import Callable
+from functools import cached_property
 from typing import Any
 
 from homeassistant.components.switch import DOMAIN as SWITCH_DOMAIN, SwitchEntity
@@ -45,7 +46,7 @@ class BaseSwitchEntity(SwitchEntity, EcoFlowBaseCommandEntity):
     def __init__(
         self,
         api: EcoFlowIoTOpenAPIInterface,
-        device: Any,  # dict[str, Any],
+        device: BaseDevice,
         mqtt_key: str,
         command: Callable[[int], dict[str, Any]],
         title: str = "",
@@ -74,7 +75,7 @@ class BaseSwitchEntity(SwitchEntity, EcoFlowBaseCommandEntity):
 class PowerSupplyPriorityEntity(BaseSwitchEntity):
     """Power supply priority switch."""
 
-    @property
+    @cached_property
     def icon(self) -> str | None:
         """Return the icon to be used for this entity."""
         if self.is_on:

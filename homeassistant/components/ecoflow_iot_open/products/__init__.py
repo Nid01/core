@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+from datetime import UTC, datetime
 import logging
 from typing import Any
 
@@ -17,10 +18,6 @@ from ..const import (
     ProductType,
 )
 
-# from ..number import BaseNumberEntity
-# from ..sensor import BaseSensorEntity
-# from ..switch import BaseSwitchEntity
-
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -29,15 +26,25 @@ class BaseDevice(ABC):
 
     def __init__(self, device_info: dict, api_interface) -> None:
         """Initialize."""
+        self._available = bool(device_info.get("online"))
         self._api = api_interface
         self._device_info: dict[str, Any] = device_info
         self._update_callback = None
         self._model: str
-        # self.device_name: str
+        self._last_updated: datetime = datetime.now(UTC)
 
     def set_update_callback(self, callback) -> None:
         """Set update callback for the device."""
         self._update_callback = callback
+
+    def set_availability(self, available: bool) -> None:
+        """Set availability status for the device."""
+        self._available = available
+
+    def set_last_updated(self, last_updated: datetime) -> None:
+        """Set last data update datetime."""
+        self.set_availability(True)
+        self._last_updated = last_updated
 
     def update_device_info(self, update: dict[str, Any]) -> None:
         """Take a dictionary and update the stored _device_info based on the present dict fields."""
@@ -128,3 +135,15 @@ class BaseDevice(ABC):
     def model(self) -> str:
         """Return the model name."""
         return self._model
+
+    @property
+    def available(self) -> bool:
+        """Return if device is available."""
+        if not bool(self._device_info.get("online")):
+            return False
+        return self._available
+
+    @property
+    def last_updated(self) -> datetime:
+        """Return last data update datetime."""
+        return self._last_updated
