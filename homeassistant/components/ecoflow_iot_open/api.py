@@ -32,6 +32,7 @@ from typing import Any, Optional, TypeVar
 from aiohttp import ClientSession
 import aiomqtt
 from aiomqtt import Client, MqttCodeError
+from aiomqtt.message import Message
 from multidict import CIMultiDict
 
 # from paho.mqtt import client as mqtt
@@ -79,7 +80,7 @@ class EcoFlowIoTOpenAPIInterface:
             Retrieve device information from EcoFlow's API.
         _process_device(self, device: dict[str, Any], products: dict[ProductType, dict[str, Any]]) -> None:
             Process device information and adds it to products.
-        _get_product_type(self, sn_prefix: str) -> Optional[ProductType]:
+        _get_product_type(self, sn_prefix: str) -> ProductType:
             Determine the product type based on serial number prefix.
         _create_product_instance(self, product_type: ProductType, device: dict[str, Any]) -> Any:
             Create an instance of a specific product type.
@@ -168,31 +169,32 @@ class EcoFlowIoTOpenAPIInterface:
 
     async def _process_device(
         self,
-        device: dict[str, Any],
+        device_info: dict[str, Any],
         filtered_products: dict[ProductType, dict[str, Any]],
         product_types: list[ProductType],
     ) -> None:
         """Process device information and adds it to filtered_products if it matches the specified types.
 
         Args:
-            device (dict[str, Any]): Device information dictionary.
+            device_info (dict[str, Any]): Device information dictionary.
             filtered_products (dict[ProductType, dict[str, Any]]): Filtered products dictionary.
             product_types (list[ProductType]): List of product types to filter.
 
         """
-        device_quota = await self.getDeviceQuota(device["sn"])
-        device.update(device_quota)
-        sn_prefix = device["sn"][:4]
+        device_quota = await self.getDeviceQuota(device_info["sn"])
+        device_info.update(device_quota)
+        device_info["status"] = device_info["online"]
+        sn_prefix = device_info["sn"][:4]
         product_type = self._get_product_type(sn_prefix)
         if product_type and product_type in product_types:
             if product_type not in filtered_products:
                 filtered_products[product_type] = {}
-            product_instance = self._create_product_instance(product_type, device)
+            product_instance = self._create_product_instance(product_type, device_info)
             filtered_products[product_type][product_instance.serial_number] = (
                 product_instance
             )
 
-    def _get_product_type(self, sn_prefix: str) -> Optional[ProductType]:
+    def _get_product_type(self, sn_prefix: str) -> ProductType:
         """Determine the product type based on serial number prefix.
 
         Args:
@@ -211,7 +213,7 @@ class EcoFlowIoTOpenAPIInterface:
         if sn_prefix == SMART_PLUG:
             return ProductType.SMART_PLUG
         # To-Do: Return diagnostic/base product type in case of unknown prefix.
-        return None
+        return ProductType.UNKNOWN
 
     def _create_product_instance(
         self, product_type: ProductType, device: dict[str, Any]
@@ -411,21 +413,26 @@ class EcoFlowIoTOpenAPIInterface:
         #             },
         #         )
 
-    async def _handle_mqtt_message(self, message):
+    async def _handle_mqtt_message(self, message: Message):
         """Handle incoming MQTT messages.
 
         Args:
             message: MQTT message.
 
         """
-        unpacked_json = json.loads(message.payload)
+
+        if not isinstance(message.payload, (bytes, bytearray)):
+            raise TypeError(
+                f"Expected payload type bytes or bytesarray, but received: {type(message.payload)}"
+            )
+        unpacked_json = json.loads(message.payload.decode("utf-8"))
         _LOGGER.debug("MQTT message from topic: %s", message.topic)
         _LOGGER.debug(json.dumps(unpacked_json, indent=2, sort_keys=True))
 
         serial_number = message.topic.value.split("/")[3]
         product_type = self._get_product_type(serial_number[:4])
 
-        if product_type not in (ProductType.UNKNOWN, None):
+        if product_type != ProductType.UNKNOWN:
             if "param" in unpacked_json:
                 unpacked_json["params"] = unpacked_json.pop("param")
             if "addr" in unpacked_json:
@@ -443,7 +450,9 @@ class EcoFlowIoTOpenAPIInterface:
                 )
 
         else:
-            _LOGGER.error("Device with serial number %s not found", serial_number)
+            _LOGGER.error(
+                "ProductType for serial number %s not supported", serial_number
+            )
 
     async def getDeviceQuota(self, serial_number: str) -> dict[str, Any]:
         """Retrieve quota information for a device.
@@ -479,6 +488,7 @@ class EcoFlowIoTOpenAPIInterface:
             for devices in self._products.values():
                 for device in devices.values():
                     quota_data = await self.getDeviceQuota(device.serial_number)
+                    quota_data["status"] = device.available
                     self.data_holder.update_params(
                         raw=quota_data, serial_number=device.serial_number
                     )
