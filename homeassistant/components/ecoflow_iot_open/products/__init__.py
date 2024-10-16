@@ -26,7 +26,7 @@ class BaseDevice(ABC):
 
     def __init__(self, device_info: dict, api_interface) -> None:
         """Initialize."""
-        self._available = bool(device_info.get("online"))
+        self._available = bool(device_info.get("status"))
         self._api = api_interface
         self._device_info: dict[str, Any] = device_info
         self._update_callback = None
@@ -45,43 +45,6 @@ class BaseDevice(ABC):
         """Set last data update datetime."""
         self.set_availability(True)
         self._last_updated = last_updated
-
-    def update_device_info(self, update: dict[str, Any]) -> None:
-        """Take a dictionary and update the stored _device_info based on the present dict fields."""
-        _set = False
-        _json_key: str
-        if self.type in (
-            ProductType.POWERSTREAM,
-            ProductType.SINGLE_AXIS_SOLAR_TRACKER,
-            ProductType.SMART_PLUG,
-        ):
-            _json_key = "param"
-        else:
-            _json_key = "params"
-
-        if update.get("addr"):
-            _prefix = str(update.get("addr")) + "."
-        else:
-            _prefix = ""
-
-        try:
-            for key, value in update[_json_key].items():
-                if isinstance(value, dict):
-                    for _key, _value in value.items():
-                        self._device_info[key][_key] = _value
-                elif key == "status":
-                    self._device_info["online"] = value
-                else:
-                    self._device_info[_prefix + key] = value
-                _set = True
-
-            if self._update_callback is not None and _set:
-                _LOGGER.debug("Calling the call back to notify updates have occurred")
-                self._update_callback()
-        except Exception:  # pylint: disable=broad-exception-caught
-            _LOGGER.error(
-                msg=("Failed to update with message: %d", update), stack_info=True
-            )
 
     @abstractmethod
     def sensors(self, api) -> Sequence[SensorEntity]:  # Sequence[BaseSensorEntity]:
@@ -124,12 +87,7 @@ class BaseDevice(ABC):
     @property
     def device_name(self) -> str:
         """Return device name."""
-        return str(self._device_info.get("deviceName"))
-
-    @property
-    def online(self) -> bool:
-        """Return if the device is online or not."""
-        return self._device_info.get("online", True)
+        return str(self._device_info.get("deviceName", self.model))
 
     @property
     def model(self) -> str:
@@ -139,8 +97,9 @@ class BaseDevice(ABC):
     @property
     def available(self) -> bool:
         """Return if device is available."""
-        if not bool(self._device_info.get("online")):
-            return False
+        if self._api.data_holder.params.get(self.serial_number):
+            if not self._api.data_holder.params[self.serial_number]["status"]:
+                return False
         return self._available
 
     @property
