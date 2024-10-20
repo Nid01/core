@@ -71,6 +71,7 @@ class SingleAxisSolarTracker(BaseDevice):
             "iot.batteryTemperature",
             "iot.water",
             "iot.wind",
+            "status",
         ]
 
         found_keys = set(degree_keys + ignored_keys)

@@ -312,6 +312,7 @@ class DELTAMax(BaseDevice):
             "mppt.dcdc12vVol",
             "mppt.inVol",
             "mppt.outVol",
+            "status",
         ]
 
         voltage_sensors = [
