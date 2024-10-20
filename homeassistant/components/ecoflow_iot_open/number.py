@@ -71,6 +71,9 @@ class BaseNumberEntity(NumberEntity, EcoFlowBaseCommandEntity):
     def _update_value(self, val: Any) -> bool:
         if self._attr_native_value != val:
             self._attr_native_value = val
+
+            if hasattr(self, "icon"):
+                del self.icon  # invalidate cached icon because doesn't update properly
             return True
         return False
 

@@ -35,10 +35,10 @@ from aiomqtt import Client, MqttCodeError
 from aiomqtt.message import Message
 from multidict import CIMultiDict
 
-# from paho.mqtt import client as mqtt
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import DOMAIN as HA_DOMAIN, HomeAssistant
 from homeassistant.helpers.issue_registry import IssueSeverity, async_create_issue
+from homeassistant.util.dt import utcnow
 
 from .const import (
     DEFAULT_AVAILABILITY_CHECK_INTERVAL_SEC,
@@ -441,12 +441,16 @@ class EcoFlowIoTOpenAPIInterface:
                     f"{addr}.{key}": value
                     for key, value in unpacked_json["params"].items()
                 }
+            timestamp = unpacked_json.get("timestamp")
+            if timestamp:
+                last_updated = datetime.fromtimestamp(timestamp / 1000, UTC)
+            else:
+                last_updated = utcnow()
+            unpacked_json["params"]["last_updated"] = last_updated
+
             if isinstance(self.data_holder, EcoFlowIoTOpenDataHolder):
                 self.data_holder.update_params(
                     raw=unpacked_json["params"], serial_number=serial_number
-                )
-                self._products[product_type][serial_number].set_last_updated(
-                    datetime.now(UTC)
                 )
 
         else:
@@ -488,7 +492,8 @@ class EcoFlowIoTOpenAPIInterface:
             for devices in self._products.values():
                 for device in devices.values():
                     quota_data = await self.getDeviceQuota(device.serial_number)
-                    quota_data["status"] = device.available
+                    quota_data["status"] = device.is_available()
+                    quota_data["last_updated"] = utcnow()
                     self.data_holder.update_params(
                         raw=quota_data, serial_number=device.serial_number
                     )

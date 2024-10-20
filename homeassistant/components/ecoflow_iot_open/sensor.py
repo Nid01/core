@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from functools import cached_property
 import json
 from typing import Any
@@ -29,6 +29,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.event import async_track_time_interval
 
 from .api import EcoFlowIoTOpenAPIInterface
 from .const import API_CLIENT, DOMAIN, PRODUCTS
@@ -43,7 +44,6 @@ async def async_setup_entry(
 ) -> None:
     """Set up sensors based on a config entry."""
 
-    # client: EcoFlowIoTOpenAPIInterface = hass.data[DOMAIN][API_CLIENT][entry.entry_id]
     api: EcoFlowIoTOpenAPIInterface = hass.data[DOMAIN][API_CLIENT][
         config_entry.entry_id
     ]
@@ -101,8 +101,24 @@ class BaseSensorEntity(SensorEntity, EcoFlowBaseEntity):
     def _update_value(self, val: Any) -> bool:
         if self._attr_native_value != val:
             self._attr_native_value = val
+
+            if hasattr(self, "icon"):
+                del self.icon  # invalidate cached icon because doesn't update properly
             return True
         return False
+
+    def attr(
+        self,
+        mqtt_key: str,
+        title: str = "",
+        default: Any = None,
+    ) -> BaseSensorEntity:
+        """Add attribute to base sensor entity."""
+        if title == "":
+            title = mqtt_key
+        self.__attributes_mapping[mqtt_key] = title
+        self.__attrs[title] = default
+        return self
 
 
 class BatterySensorEntity(BaseSensorEntity):
@@ -609,6 +625,72 @@ class ScenesSensorEntity(BaseSensorEntity):
         # return "mdi:eye"
 
 
+class StatusSensorEntity(BaseSensorEntity):
+    """Sensor for device status."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    _attr_icon = "mdi:wifi"
+
+    def __init__(
+        self,
+        api: EcoFlowIoTOpenAPIInterface,
+        device: BaseDevice,
+        mqtt_key: str,
+        title: str = "",
+        enabled: bool = True,
+        auto_enable: bool = False,
+    ) -> None:
+        """Initialize with list_position and additional dictionary key."""
+
+        super().__init__(api, device, mqtt_key, title, enabled, auto_enable)
+        async_track_time_interval(
+            self.hass,
+            self._check_device_availability,
+            timedelta(seconds=self._api.availability_check_interval_sec),
+        )
+
+    async def _check_device_availability(self, now):
+        """Periodically check and update device availability."""
+        if self.state == "online":
+            if self.extra_state_attributes and self.extra_state_attributes.get(
+                "last_updated"
+            ):
+                time_diff = now - self.extra_state_attributes["last_updated"]
+                device_online = time_diff < timedelta(
+                    seconds=self._api.availability_check_interval_sec * 4
+                )
+                if not device_online:
+                    self._device.set_availability(device_online)
+                    self.hass.bus.fire(
+                        f"device_{self._device.serial_number}_availability", {}
+                    )
+                    super()._update_value("assume_offline")
+
+    def _update_value(self, val: Any) -> bool:
+        self._device.set_availability(val)
+        self.hass.bus.fire(f"device_{self._device.serial_number}_availability", {})
+
+        if super()._update_value("online" if val else "offline"):
+            return True
+        return False
+
+    @cached_property
+    def icon(self) -> str | None:
+        """Device status icon handling."""
+
+        if self.state == "online":
+            return "mdi:wifi"
+        if self.state == "assume_offline":
+            return "mdi:wifi-alert"
+        return "mdi:wifi-off"
+
+    @cached_property
+    def available(self) -> bool:
+        """Returns the status sensor entity always as available."""
+        return True
+
+
 class TemperateSensorEntity(BaseSensorEntity):
     """Sensor for temperature."""
 
@@ -681,7 +763,6 @@ class VoltageSensorEntity(BaseSensorEntity):
     # _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_native_unit_of_measurement = UnitOfElectricPotential.VOLT
     _attr_state_class = SensorStateClass.MEASUREMENT
-    # _attr_native_value = 0
 
     def __init__(
         self,

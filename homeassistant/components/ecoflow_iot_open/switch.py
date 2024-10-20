@@ -58,8 +58,13 @@ class BaseSwitchEntity(SwitchEntity, EcoFlowBaseCommandEntity):
         self.entity_id = f"{SWITCH_DOMAIN}.{device.device_name.replace(' ', '_').replace('-', '_').replace('.', '_')}_{mqtt_key}"
 
     def _update_value(self, val: Any) -> bool:
-        self._attr_is_on = bool(val)
-        return True
+        if self._attr_is_on != bool(val):
+            self._attr_is_on = bool(val)
+
+            if hasattr(self, "icon"):
+                del self.icon  # invalidate cached icon because doesn't update properly
+            return True
+        return False
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the switch."""
