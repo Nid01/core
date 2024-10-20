@@ -92,16 +92,6 @@ class DELTAMax(BaseDevice):
             if key in device_info_keys
         ]
 
-        brightness_keys = [
-            "pd.lcdBrightness",
-        ]
-
-        brightness_sensors = [
-            BrightnessSensorEntity(api, self, key)
-            for key in brightness_keys
-            if key in device_info_keys
-        ]
-
         charging_state_keys = [
             "pd.sysChgDsgState",
             "ems.chgState",
@@ -364,6 +354,7 @@ class DELTAMax(BaseDevice):
             "bmsMaster.cellVol",
             "bmsSlave1.cellVol",
             "pd.beepMode",
+            "pd.lcdBrightness",
             # icons
             "pd.iconAcFreqMode",
             "pd.iconAcFreqState",
@@ -424,7 +415,6 @@ class DELTAMax(BaseDevice):
         found_keys = set(
             battery_keys
             + binary_state_keys
-            + brightness_keys
             + charging_state_keys
             + current_keys
             + cycles_keys
@@ -457,7 +447,7 @@ class DELTAMax(BaseDevice):
         return [
             *binary_state_sensors,
             *battery_sensors,
-            *brightness_sensors,
+            BrightnessSensorEntity(api, self, "pd.lcdBrightness"),
             *charging_state_sensors,
             *current_sensors,
             *cycles_sensors,
