@@ -17,6 +17,7 @@ from ..sensor import (
     FrequencySensorEntity,
     PowerSensorEntity,
     TemperateSensorEntity,
+    TimestampSensorEntity,
     VoltageSensorEntity,
 )
 from ..switch import BaseSwitchEntity
@@ -47,18 +48,6 @@ class SmartPlug(BaseDevice):
             if key in device_info_keys
         ]
 
-        duration_keys = [
-            "iot.mqttErrTime",
-            "iot.runTime",
-            "iot.wifiErrTime",
-        ]
-
-        duration_sensors = [
-            DurationSensorEntity(api, self, key, UnitOfTime.SECONDS)
-            for key in duration_keys
-            if key in device_info_keys
-        ]
-
         power_keys = [
             "iot.consWatt",
             "iot.geneWatt",
@@ -74,6 +63,17 @@ class SmartPlug(BaseDevice):
                 0.1,
             )
             for key in power_keys
+            if key in device_info_keys
+        ]
+
+        timestamp_keys = [
+            "iot.mqttErrTime",
+            "iot.wifiErrTime",
+        ]
+
+        timestamp_sensors = [
+            TimestampSensorEntity(api, self, key)
+            for key in timestamp_keys
             if key in device_info_keys
         ]
 
@@ -100,7 +100,7 @@ class SmartPlug(BaseDevice):
             "iot.volt",
         ]
 
-        found_keys = set(current_keys + duration_keys + ignored_keys + power_keys)
+        found_keys = set(current_keys + ignored_keys + power_keys + timestamp_keys)
 
         diagnostic_keys = device_info_keys - found_keys
 
@@ -112,10 +112,11 @@ class SmartPlug(BaseDevice):
             CountSensorEntity(api, self, "iot.resetCount"),
             *current_sensors,
             *diagnostic_sensors,
-            *duration_sensors,
+            DurationSensorEntity(api, self, "iot.runTime", UnitOfTime.SECONDS),
             FrequencySensorEntity(api, self, "iot.freq"),
             *power_sensors,
             TemperateSensorEntity(api, self, "iot.temp"),
+            *timestamp_sensors,
             VoltageSensorEntity(api, self, "iot.volt"),
         ]
 

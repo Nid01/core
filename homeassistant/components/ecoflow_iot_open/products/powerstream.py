@@ -2,6 +2,8 @@
 
 from collections.abc import Sequence
 
+from homeassistant.const import UnitOfTime
+
 from ..api import EcoFlowIoTOpenAPIInterface
 from ..number import BaseNumberEntity, BatteryLevelEntity, BrightnessEntity, PowerEntity
 from ..sensor import (
@@ -14,6 +16,7 @@ from ..sensor import (
     FrequencySensorEntity,
     PowerSensorEntity,
     TemperateSensorEntity,
+    TimestampSensorEntity,
     VoltageSensorEntity,
 )
 from ..switch import BaseSwitchEntity, PowerSupplyPriorityEntity
@@ -49,11 +52,21 @@ class PowerStream(BaseDevice):
 
         duration_keys = [
             "iot.chgRemainTime",
+            "iot.connectTime",
             "iot.dsgRemainTime",
         ]
 
+        duration_units = {
+            "iot.connectTime": UnitOfTime.SECONDS,
+        }
+
         duration_sensors = [
-            DurationSensorEntity(api, self, key)
+            DurationSensorEntity(
+                api,
+                self,
+                key,
+                duration_units.get(key, UnitOfTime.MINUTES),
+            )
             for key in duration_keys
             if key in device_info_keys
         ]
@@ -163,6 +176,17 @@ class PowerStream(BaseDevice):
             "iot.pv2Temp",
         ]
 
+        timestamp_keys = [
+            "iot.mqttErrTime",
+            "iot.wifiErrTime",
+        ]
+
+        timestamp_sensors = [
+            TimestampSensorEntity(api, self, key)
+            for key in timestamp_keys
+            if key in device_info_keys
+        ]
+
         temperature_sensors = [
             TemperateSensorEntity(
                 api,
@@ -213,7 +237,6 @@ class PowerStream(BaseDevice):
             "iot.invBrightness",
             "iot.invFreq",
             "iot.lowerLimit",
-            "iot.mqttErrTime",  # Parse integer value as datetime?
             "iot.permanentWatts",
             "iot.resetCount",
             "iot.task1",
@@ -227,9 +250,7 @@ class PowerStream(BaseDevice):
             "iot.task9",
             "iot.task10",
             "iot.task11",
-            "iot.updateTime",
             "iot.upperLimit",
-            "iot.wifiErrTime",  # Parse integer value as datetime?
         ]
 
         found_keys = set(
@@ -238,6 +259,7 @@ class PowerStream(BaseDevice):
             + ignored_keys
             + power_keys
             + temperature_keys
+            + timestamp_keys
             + voltage_keys
         )
 
@@ -259,6 +281,7 @@ class PowerStream(BaseDevice):
             *voltage_sensors,
             # StatusSensorEntity(api, self),
             *temperature_sensors,
+            *timestamp_sensors,
         ]
 
     def switches(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[BaseSwitchEntity]:
@@ -328,5 +351,3 @@ class PowerStream(BaseDevice):
 
     # def datetimes(...)..
     # DateTimeEntity(dataHolder, self, "iot.updateTime"),
-    # DateTimeEntity(dataHolder, self, "iot.wifiErrTime"), # Parse integer value as datetime?
-    # MiscSensorEntity(dataHolder, self, "iot.mqttErrTime"), # Parse integer value as datetime?
