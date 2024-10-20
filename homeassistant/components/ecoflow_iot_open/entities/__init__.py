@@ -117,18 +117,26 @@ class EcoFlowBaseEntity(Entity):
     def _updated(self, data: dict[str, Any]) -> None:
         """Update attributes and values."""
         if data.get(self.serial_number):
+            schedule_atrribute_update = False
+            schedule_value_update = False
             # update attributes
             for key, title in self.__attributes_mapping.items():
-                if key in data:
-                    self.__attrs[title] = data[key]
+                if key in data[self.serial_number]:
+                    if self.__attrs[title] != data[self.serial_number][key]:
+                        self.__attrs[title] = data[self.serial_number][key]
+                        schedule_atrribute_update = True
 
             # update value
             if self._mqtt_key in data[self.serial_number]:
                 if self._auto_enable:
                     self._attr_entity_registry_enabled_default = True
 
-                if self._update_value(data[self.serial_number][self._mqtt_key]):
-                    self.schedule_update_ha_state()
+                schedule_value_update = self._update_value(
+                    data[self.serial_number][self._mqtt_key]
+                )
+
+            if schedule_atrribute_update or schedule_value_update:
+                self.schedule_update_ha_state()
 
     def _update_value(self, val: Any) -> bool:
         return False
