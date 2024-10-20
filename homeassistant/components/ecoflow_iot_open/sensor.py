@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections import OrderedDict
 from datetime import UTC, datetime, timedelta
 from functools import cached_property
 import json
@@ -82,9 +81,6 @@ class BaseSensorEntity(SensorEntity, EcoFlowBaseEntity):
         else:
             self.entity_id = f"{SENSOR_DOMAIN}.{device.device_name.replace(' ', '_').replace('-', '_').replace('.', '_')}_{mqtt_key}"
 
-        self.__attributes_mapping: dict[str, str] = {}
-        self.__attrs = OrderedDict[str, Any]()
-
         # self.entity_description = description
 
         if mqtt_key in (
@@ -110,19 +106,6 @@ class BaseSensorEntity(SensorEntity, EcoFlowBaseEntity):
                 del self.icon  # invalidate cached icon because doesn't update properly
             return True
         return False
-
-    def attr(
-        self,
-        mqtt_key: str,
-        title: str = "",
-        default: Any = None,
-    ) -> BaseSensorEntity:
-        """Add attribute to base sensor entity."""
-        if title == "":
-            title = mqtt_key
-        self.__attributes_mapping[mqtt_key] = title
-        self.__attrs[title] = default
-        return self
 
 
 class BatterySensorEntity(BaseSensorEntity):
