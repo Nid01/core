@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from functools import cached_property
 import json
 from typing import Any
@@ -646,6 +647,15 @@ class TemperateSensorEntity(BaseSensorEntity):
             return super()._update_value(value * self._factor)
         # cellTemp-0, ellTemp-1, cellTemp-2, ... show unsually high values like 12374
         return super()._update_value(value / 1000 * self._factor)
+
+
+class TimestampSensorEntity(BaseSensorEntity):
+    """Sensor for timestamp."""
+
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def _update_value(self, val: Any) -> bool:
+        return super()._update_value(datetime.fromtimestamp(val, UTC))
 
 
 # class InMilliVoltSensorEntity(MilliVoltSensorEntity):
