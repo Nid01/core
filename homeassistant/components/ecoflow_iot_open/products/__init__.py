@@ -46,6 +46,14 @@ class BaseDevice(ABC):
         self.set_availability(True)
         self._last_updated = last_updated
 
+    def remove_unnecessary_keys(self, keys: set) -> set:
+        """Remove unnecessary device info keys from set."""
+        keys.remove("deviceName")
+        keys.remove("online")
+        keys.remove("productName")
+        keys.remove("sn")
+        return keys
+
     @abstractmethod
     def sensors(self, api) -> Sequence[SensorEntity]:  # Sequence[BaseSensorEntity]:
         """Return a empty list of SensorEntityDescription."""
