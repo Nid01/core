@@ -27,7 +27,7 @@ import os
 import random
 import ssl
 import time
-from typing import Any, Optional, TypeVar
+from typing import Any, Optional
 
 from aiohttp import ClientSession
 import aiomqtt
@@ -59,8 +59,6 @@ from .products import BaseDevice, ProductType
 
 _LOGGER = logging.getLogger(__name__)
 _CLIENT_LOGGER = logging.getLogger(f"{__name__}.client")
-
-ApiType = TypeVar("ApiType", bound="EcoFlowIoTOpenAPIInterface")
 
 
 class EcoFlowIoTOpenAPIInterface:
