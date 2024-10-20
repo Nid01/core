@@ -34,10 +34,7 @@ class SmartPlug(BaseDevice):
     def sensors(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[SensorEntity]:
         """Available sensors for Smart Plug."""
 
-        device_info_keys = set(self._device_info.keys())
-        device_info_keys.remove("deviceName")
-        device_info_keys.remove("online")
-        device_info_keys.remove("sn")
+        device_info_keys = self.remove_unnecessary_keys(set(self._device_info.keys()))
 
         count_keys = [
             "iot.resetCount",

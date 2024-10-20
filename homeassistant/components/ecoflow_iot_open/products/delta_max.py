@@ -40,10 +40,7 @@ class DELTAMax(BaseDevice):
     def sensors(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[SensorEntity]:
         """Available sensors for DELTA Max."""
 
-        device_info_keys = set(self._device_info.keys())
-        device_info_keys.remove("deviceName")
-        device_info_keys.remove("online")
-        device_info_keys.remove("sn")
+        device_info_keys = self.remove_unnecessary_keys(set(self._device_info.keys()))
 
         def add_cell_sensors(cell_key, sensors: list, SensorEntityClass):
             if cell_key in device_info_keys:
