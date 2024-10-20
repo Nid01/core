@@ -84,6 +84,7 @@ class DELTAMax(BaseDevice):
 
         binary_state_keys = [
             "inv.fanState",
+            "pd.beepState",
         ]
 
         binary_state_sensors = [
@@ -353,7 +354,6 @@ class DELTAMax(BaseDevice):
             "bmsSlave1.cellTemp",
             "bmsMaster.cellVol",
             "bmsSlave1.cellVol",
-            "pd.beepMode",
             "pd.lcdBrightness",
             # icons
             "pd.iconAcFreqMode",
@@ -445,8 +445,8 @@ class DELTAMax(BaseDevice):
         ]
 
         return [
-            *binary_state_sensors,
             *battery_sensors,
+            *binary_state_sensors,
             BrightnessSensorEntity(api, self, "pd.lcdBrightness"),
             *charging_state_sensors,
             *current_sensors,

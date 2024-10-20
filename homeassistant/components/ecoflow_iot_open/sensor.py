@@ -148,6 +148,8 @@ class BinaryStateSensorEntity(BaseSensorEntity):
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def _update_value(self, val: Any) -> bool:
+        if self.name == "pd.beepState":
+            return super()._update_value("Off" if val else "On")
         if val & (1 << 0):
             return super()._update_value("On")
         return super()._update_value("Off")
@@ -155,7 +157,7 @@ class BinaryStateSensorEntity(BaseSensorEntity):
     @cached_property
     def icon(self) -> str:
         """Icon for binary state in context of mqtt key."""
-        if self._attr_name == "beeper":
+        if self._attr_name in ("beeper", "pd.beepState"):
             if self.state == "On":
                 return "mdi:volume-high"
             return "mdi:volume-mute"
