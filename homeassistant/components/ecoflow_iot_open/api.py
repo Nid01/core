@@ -74,7 +74,7 @@ class EcoFlowIoTOpenAPIInterface:
     Methods:
         __init__(self, accessKey: str, secretKey: str, data_holder: Optional[EcoFlowIoTOpenDataHolder] = None) -> None:
             Initialize an EcoFlowIoTOpenAPIInterface instance.
-        certification(cls: type[ApiType], accessKey: str, secretKey: str, data_holder: Optional[EcoFlowIoTOpenDataHolder] = None) -> ApiType:
+        certification() -> None:
             Class method for creating a certified EcoFlowIoTOpenAPIInterface instance.
         _get_devices(self) -> None:
             Retrieve device information from EcoFlow's API.
@@ -122,18 +122,18 @@ class EcoFlowIoTOpenAPIInterface:
             accessKey (str): Access key for authentication.
             secretKey (str): Secret key for authentication.
             base_url (str): Base URL for the API.
-            data_holder (Optional[EcoFlowIoTOpenDataHolder]): Holder for EcoFlow IoT Open data. Defaults to None.
             availability_check_interval_sec (int): Interval in which the sensors of devices will be checked, if the device didn't send data updates for too long.
 
         Attributes:
+            hass(HomeAssistant): Stores the provided hass object.
+            data_holder (Optional[EcoFlowIoTOpenDataHolder]): Holder for EcoFlow IoT Open data.
             _accessKey (str): Stores the provided access key.
-            _secretKey (str): Stores the provided secret key.
             _base_url (str): Stores the provided base URL.
             _certification (dict[str, Any]): Dictionary to hold certification data.
-            _products (dict[ProductType, dict[str, Any]]): Dictionary to hold products data.
             _mqtt_client (Client): MQTT client for communication.
-            mqtt_listener (Optional[asyncio.Task]): Task for handling MQTT messages. Defaults to None.
-            _data_holder (Optional[EcoFlowIoTOpenDataHolder]): Holder for EcoFlow IoT Open data.
+            _mqtt_listener (Optional[asyncio.Task]): Task for handling MQTT messages. Defaults to None.
+            _products (dict[ProductType, dict[str, Any]]): Dictionary to hold products data.
+            _secretKey (str): Stores the provided secret key.
 
         """
         self._accessKey = accessKey
@@ -152,19 +152,7 @@ class EcoFlowIoTOpenAPIInterface:
     async def certification(
         self,
     ) -> None:
-        """Class method for creating a certified EcoFlowIoTOpenAPIInterface instance.
-
-        Args:
-            cls (type[ApiType]): Class object of type ApiType.
-            accessKey (str): Access key for authentication.
-            secretKey (str): Secret key for authentication.
-            base_url (str): Base URL for the API.
-            data_holder (Optional[EcoFlowIoTOpenDataHolder]): Holder for EcoFlow IoT Open data. Defaults to None.
-
-        Returns:
-            ApiType: Certified EcoFlowIoTOpenAPIInterface instance.
-
-        """
+        """Class method for creating a certified EcoFlowIoTOpenAPIInterface instance."""
         await self._authenticate()
 
     async def _process_device(
@@ -201,7 +189,7 @@ class EcoFlowIoTOpenAPIInterface:
             sn_prefix (str): Serial number prefix.
 
         Returns:
-            Optional[ProductType]: Product type if determined, else None.
+            ProductType: Product type if determined, else unknown.
 
         """
         if sn_prefix == DELTA_MAX:
@@ -244,7 +232,7 @@ class EcoFlowIoTOpenAPIInterface:
             return SmartPlug(device, self)
 
         raise EcoFlowIoTOpenError("Unknown Device")
-        # To-Do: Return diagnostic/base product instance in case of unknown prefix.
+        # TODO: Return diagnostic/base product instance in case of unknown prefix. # pylint: disable=fixme
         # return None
 
     async def get_devices_by_product(
