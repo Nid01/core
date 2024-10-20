@@ -28,12 +28,7 @@ class BaseDevice(ABC):
         self._available = bool(device_info.get("online"))
         self._api = api_interface
         self._device_info: dict[str, Any] = device_info
-        self._update_callback = None
         self._model: str
-
-    def set_update_callback(self, callback) -> None:
-        """Set update callback for the device."""
-        self._update_callback = callback
 
     def set_availability(self, available: bool) -> None:
         """Set availability status for the device."""

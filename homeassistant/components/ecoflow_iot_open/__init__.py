@@ -7,7 +7,6 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers.dispatcher import dispatcher_send
 
 from .api import EcoFlowIoTOpenAPIInterface
 from .const import (
@@ -80,14 +79,6 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     await api.initializeDevices()
 
     await api.connect(hass, config_entry)
-
-    def update_published():
-        """Handle a push update."""
-        dispatcher_send(hass, PUSH_UPDATE)
-
-    for devices in products.values():
-        for device in devices.values():
-            device.set_update_callback(update_published)
 
     return True
 

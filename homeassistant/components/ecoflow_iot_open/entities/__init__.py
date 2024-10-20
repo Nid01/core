@@ -59,7 +59,6 @@ class EcoFlowBaseEntity(Entity):
         self._device = device
         self._mqtt_key = mqtt_key
 
-        self._update_callback: Callable[[], None] | None = None
         self.__attributes_mapping: dict[str, str] = {}
         self.__attrs = OrderedDict[str, Any]()
 
@@ -129,15 +128,6 @@ class EcoFlowBaseEntity(Entity):
 
     def _update_value(self, val: Any) -> bool:
         return False
-
-    @callback
-    def on_update_received(self) -> None:
-        """Update was pushed from the EcoFlow API."""
-        self.schedule_update_ha_state()
-
-    def set_update_callback(self, update_callback: Callable[[], None]) -> None:
-        """Set callback to run when state changes."""
-        self._update_callback = update_callback
 
     @cached_property
     def serial_number(self) -> str:
