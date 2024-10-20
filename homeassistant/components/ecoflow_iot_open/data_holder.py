@@ -30,8 +30,8 @@ class EcoFlowIoTOpenDataHolder:
         if not self.params.get(serial_number):
             self.params[serial_number] = {}
         self.params[serial_number].update(raw)
-        self.__broadcast()
+        self.__broadcast(serial_number)
 
-    def __broadcast(self):
+    def __broadcast(self, serial_number: str):
         """Broadcoast updated device params."""
-        self.__params_observable.on_next(self.params)
+        self.__params_observable.on_next({serial_number: self.params[serial_number]})
