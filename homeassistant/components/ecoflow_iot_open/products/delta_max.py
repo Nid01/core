@@ -410,6 +410,7 @@ class DELTAMax(BaseDevice):
             "pd.iconWindGenState",
             "pd.iconWirelessChgMode",
             "pd.iconWirelessChgState",
+            "status",
         ]
 
         found_keys = set(
