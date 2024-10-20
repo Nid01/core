@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import OrderedDict
 from collections.abc import Callable, Mapping
 from functools import cached_property
-from typing import Any
+from typing import Any, TypeVar
 
 from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -15,7 +15,7 @@ from ..api import EcoFlowIoTOpenAPIInterface
 from ..const import DOMAIN, ECOFLOW
 from ..products import BaseDevice
 
-# from ..products import EcoFlowDeviceInfo
+T = TypeVar("T", bound="EcoFlowBaseEntity")
 
 
 class EcoFlowBaseEntity(Entity):
@@ -82,11 +82,11 @@ class EcoFlowBaseEntity(Entity):
         return "ecoflow-" + sn + "-" + key.replace(".", "-").replace("_", "-")
 
     def attr(
-        self,
+        self: T,
         mqtt_key: str,
         title: str = "",
         default: Any = None,
-    ) -> EcoFlowBaseEntity:
+    ) -> T:
         """Add attribute to entity."""
         if title == "":
             title = mqtt_key
