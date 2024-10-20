@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from datetime import UTC, datetime, timedelta
 from functools import cached_property
 import json
@@ -80,6 +81,9 @@ class BaseSensorEntity(SensorEntity, EcoFlowBaseEntity):
             self.entity_id = f"{SENSOR_DOMAIN}.{device.device_name.replace(' ', '_').replace('-', '_').replace('.', '_')}_{title}"
         else:
             self.entity_id = f"{SENSOR_DOMAIN}.{device.device_name.replace(' ', '_').replace('-', '_').replace('.', '_')}_{mqtt_key}"
+
+        self.__attributes_mapping: dict[str, str] = {}
+        self.__attrs = OrderedDict[str, Any]()
 
         # self.entity_description = description
 
