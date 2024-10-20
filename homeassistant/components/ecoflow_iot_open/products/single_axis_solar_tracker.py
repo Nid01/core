@@ -22,6 +22,7 @@ from ..sensor import (
     ProtectionFromRainSensorEntity,
     ProtectionFromWindSensorEntity,
     ScenesSensorEntity,
+    StatusSensorEntity,
     TemperateSensorEntity,
     WaterSensorEntity,
     WindSensorEntity,
@@ -103,6 +104,7 @@ class SingleAxisSolarTracker(BaseDevice):
             ProtectionFromWindSensorEntity(
                 api, self, "iot.switchState", "wind protection"
             ),
+            StatusSensorEntity(api, self, "status").attr("last_updated"),
             TemperateSensorEntity(api, self, "iot.batteryTemperature"),
             WaterSensorEntity(api, self, "iot.water"),
             WindSensorEntity(api, self, "iot.wind"),

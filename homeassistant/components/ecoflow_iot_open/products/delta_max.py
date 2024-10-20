@@ -21,7 +21,7 @@ from ..sensor import (
     EnergyStorageSensorEntity,
     PowerSensorEntity,
     ProductInfoDetailSensorEntity,
-    # StatusSensorEntity,
+    StatusSensorEntity,
     TemperateSensorEntity,
     VoltageSensorEntity,
 )
@@ -35,7 +35,6 @@ class DELTAMax(BaseDevice):
         """Initialize."""
         super().__init__(device_info, api_interface)
         self._model = "DELTA Max"
-        # self._client: EcoFlowIoTOpenAPIInterface
 
     def sensors(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[SensorEntity]:
         """Available sensors for DELTA Max."""
@@ -457,7 +456,7 @@ class DELTAMax(BaseDevice):
             *energy_storage_sensors,
             *power_sensors,
             *product_info_detail_sensors,
-            # StatusSensorEntity(api, self),
+            StatusSensorEntity(api, self, "status").attr("last_updated"),
             *temperature_sensors,
             *voltage_sensors,
         ]

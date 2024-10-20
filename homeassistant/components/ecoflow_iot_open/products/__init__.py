@@ -2,7 +2,6 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from datetime import UTC, datetime
 import logging
 from typing import Any
 
@@ -26,12 +25,11 @@ class BaseDevice(ABC):
 
     def __init__(self, device_info: dict, api_interface) -> None:
         """Initialize."""
-        self._available = bool(device_info.get("status"))
+        self._available = bool(device_info.get("online"))
         self._api = api_interface
         self._device_info: dict[str, Any] = device_info
         self._update_callback = None
         self._model: str
-        self._last_updated: datetime = datetime.now(UTC)
 
     def set_update_callback(self, callback) -> None:
         """Set update callback for the device."""
@@ -40,11 +38,6 @@ class BaseDevice(ABC):
     def set_availability(self, available: bool) -> None:
         """Set availability status for the device."""
         self._available = available
-
-    def set_last_updated(self, last_updated: datetime) -> None:
-        """Set last data update datetime."""
-        self.set_availability(True)
-        self._last_updated = last_updated
 
     def remove_unnecessary_keys(self, keys: set) -> set:
         """Remove unnecessary device info keys from set."""
@@ -57,7 +50,6 @@ class BaseDevice(ABC):
     @abstractmethod
     def sensors(self, api) -> Sequence[SensorEntity]:  # Sequence[BaseSensorEntity]:
         """Return a empty list of SensorEntityDescription."""
-        # pass
 
     @abstractmethod
     def switches(self, api) -> Sequence[SwitchEntity]:  # Sequence[BaseSwitchEntity]:
@@ -102,15 +94,9 @@ class BaseDevice(ABC):
         """Return the model name."""
         return self._model
 
-    @property
-    def available(self) -> bool:
-        """Return if device is available."""
+    def is_available(self) -> bool:
+        """Return the current device availability."""
         if self._api.data_holder.params.get(self.serial_number):
             if not self._api.data_holder.params[self.serial_number]["status"]:
                 return False
         return self._available
-
-    @property
-    def last_updated(self) -> datetime:
-        """Return last data update datetime."""
-        return self._last_updated

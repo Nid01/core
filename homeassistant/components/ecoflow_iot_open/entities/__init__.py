@@ -3,15 +3,13 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from collections.abc import Callable
-from datetime import datetime, timedelta
+from collections.abc import Callable, Mapping
 from functools import cached_property
 from typing import Any
 
 from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
-from homeassistant.helpers.event import async_track_time_interval
 
 from ..api import EcoFlowIoTOpenAPIInterface
 from ..const import DOMAIN, ECOFLOW
@@ -41,16 +39,7 @@ class EcoFlowBaseEntity(Entity):
             title = mqtt_key
 
         self._api = api
-        self._attr_available = device.available
-        self._attr_entity_registry_enabled_default = enabled
-        self._attr_name = title
-        # f"{device.device_name} {title}"
-        # f"{device.device_name}_{mqtt_key}"
-        unique_id = f"{device.serial_number}_{mqtt_key}"
-        self._attr_unique_id = unique_id
-        # self._attr_unique_id = f"{device.serial_number}_{device.device_name}"
-        # self._attr_unique_id = self.gen_unique_id(device.serial_number, mqtt_key)
-        self._auto_enable = auto_enable
+        self._attr_available = device.is_available()
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, device.serial_number)},
             manufacturer=ECOFLOW,
@@ -58,13 +47,35 @@ class EcoFlowBaseEntity(Entity):
             name=device.device_name,
             serial_number=device.serial_number,
         )
+        self._attr_entity_registry_enabled_default = enabled
+        self._attr_name = title
+        # f"{device.device_name} {title}"
+        # f"{device.device_name}_{mqtt_key}"
+        # self._attr_unique_id = f"{device.serial_number}_{device.device_name}"
+        # self._attr_unique_id = self.gen_unique_id(device.serial_number, mqtt_key)
+        unique_id = f"{device.serial_number}_{mqtt_key}"
+        self._attr_unique_id = unique_id
+        self._auto_enable = auto_enable
         self._device = device
-
         self._mqtt_key = mqtt_key
+
         self._update_callback: Callable[[], None] | None = None
         self.__attributes_mapping: dict[str, str] = {}
-
         self.__attrs = OrderedDict[str, Any]()
+
+        self.hass.bus.async_listen(
+            f"device_{self._device.serial_number}_availability",
+            self._handle_availability_change,
+        )
+
+    @callback
+    def _handle_availability_change(self, event):
+        """Handle availability change events."""
+
+        if hasattr(self, "available"):
+            del self.available
+            if self.hass:
+                self.schedule_update_ha_state()
 
     @staticmethod
     def gen_unique_id(sn: str, key: str):
@@ -91,28 +102,6 @@ class EcoFlowBaseEntity(Entity):
             self._updated
         )
         self.async_on_remove(disposableBase.dispose)
-
-        self.async_on_remove(
-            async_track_time_interval(
-                self.hass,
-                self._check_status,
-                timedelta(seconds=self._api.availability_check_interval_sec),
-            )
-        )
-
-    def _check_status(self, now: datetime) -> None:
-        if self._device.available:
-            time_diff = now - self._device.last_updated
-            available = time_diff <= timedelta(
-                seconds=self._api.availability_check_interval_sec * 4
-            )
-            self._attr_available = available
-            self._device.set_availability(available)
-            self.schedule_update_ha_state()
-        else:
-            self._attr_available = False
-            self._device.set_availability(False)
-            self.schedule_update_ha_state()
 
     def _updated(self, data: dict[str, Any]) -> None:
         """Update attributes and values."""
@@ -158,6 +147,16 @@ class EcoFlowBaseEntity(Entity):
             if isinstance(serial_number, str):
                 return serial_number
         return ""
+
+    @cached_property
+    def extra_state_attributes(self) -> Mapping[str, Any] | None:
+        """Returns optionally set entity attributes."""
+        return self.__attrs
+
+    @cached_property
+    def available(self) -> bool:
+        """Returns the availability status of the entity."""
+        return self._device.is_available()
 
 
 class EcoFlowBaseCommandEntity(EcoFlowBaseEntity):
