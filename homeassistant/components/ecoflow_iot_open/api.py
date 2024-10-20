@@ -134,6 +134,10 @@ class EcoFlowIoTOpenAPIInterface:
             _secretKey (str): Stores the provided secret key.
 
         """
+        self.availability_check_interval_sec = availability_check_interval_sec
+        self.data_holder = EcoFlowIoTOpenDataHolder()
+        self.hass = hass
+
         self._accessKey = accessKey
         self._base_url = base_url
         self._certification: dict[str, Any]
@@ -143,9 +147,6 @@ class EcoFlowIoTOpenAPIInterface:
         self._products: dict[ProductType, dict[str, Any]] = {}
         self._reconnects = 0
         self._secretKey = secretKey
-        self.hass = hass
-        self.data_holder = EcoFlowIoTOpenDataHolder()
-        self.availability_check_interval_sec = availability_check_interval_sec
 
     async def certification(
         self,
