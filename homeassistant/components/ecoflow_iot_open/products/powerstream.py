@@ -33,36 +33,6 @@ class PowerStream(BaseDevice):
 
         device_info_keys = self.remove_unnecessary_keys(set(self._device_info.keys()))
 
-        battery_keys = [
-            "iot.batSoc",
-        ]
-
-        battery_sensors = [
-            BatterySensorEntity(api, self, key)
-            for key in battery_keys
-            if key in device_info_keys
-        ]
-
-        # brightness_keys = [
-        #     "iot.invBrightness",
-        # ]
-
-        # brightness_sensors = [
-        #     BrightnessSensorEntity(api, self, key)
-        #     for key in brightness_keys
-        #     if key in device_info_keys
-        # ]
-
-        count_keys = [
-            "iot.resetCount",
-        ]
-
-        count_sensors = [
-            CountSensorEntity(api, self, key)
-            for key in count_keys
-            if key in device_info_keys
-        ]
-
         current_keys = [
             "iot.batInputCur",
             "iot.bmsReqChgAmp",
@@ -85,16 +55,6 @@ class PowerStream(BaseDevice):
         duration_sensors = [
             DurationSensorEntity(api, self, key)
             for key in duration_keys
-            if key in device_info_keys
-        ]
-
-        frequency_keys = [
-            "iot.invFreq",
-        ]
-
-        frequency_sensors = [
-            FrequencySensorEntity(api, self, key, 10)
-            for key in frequency_keys
             if key in device_info_keys
         ]
 
@@ -248,11 +208,14 @@ class PowerStream(BaseDevice):
             "iot.2_1",
             "iot.2_2",
             "iot.batInputWatts",
+            "iot.batSoc",
             "iot.historyBatInputWatts",
             "iot.invBrightness",
+            "iot.invFreq",
             "iot.lowerLimit",
             "iot.mqttErrTime",  # Parse integer value as datetime?
             "iot.permanentWatts",
+            "iot.resetCount",
             "iot.task1",
             "iot.task2",
             "iot.task3",
@@ -270,11 +233,8 @@ class PowerStream(BaseDevice):
         ]
 
         found_keys = set(
-            battery_keys
-            + count_keys
-            + current_keys
+            current_keys
             + duration_keys
-            + frequency_keys
             + ignored_keys
             + power_keys
             + temperature_keys
@@ -289,12 +249,12 @@ class PowerStream(BaseDevice):
         ]
 
         return [
-            *battery_sensors,
-            *count_sensors,
+            BatterySensorEntity(api, self, "iot.batSoc"),
+            CountSensorEntity(api, self, "iot.resetCount"),
             *current_sensors,
             *duration_sensors,
             *diagnostic_sensors,
-            *frequency_sensors,
+            FrequencySensorEntity(api, self, "iot.invFreq", 10),
             *power_sensors,
             *voltage_sensors,
             # StatusSensorEntity(api, self),

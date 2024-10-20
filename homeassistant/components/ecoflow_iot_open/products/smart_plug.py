@@ -36,16 +36,6 @@ class SmartPlug(BaseDevice):
 
         device_info_keys = self.remove_unnecessary_keys(set(self._device_info.keys()))
 
-        count_keys = [
-            "iot.resetCount",
-        ]
-
-        count_sensors = [
-            CountSensorEntity(api, self, key)
-            for key in count_keys
-            if key in device_info_keys
-        ]
-
         current_keys = [
             "iot.current",
             "iot.maxCur",
@@ -69,16 +59,6 @@ class SmartPlug(BaseDevice):
             if key in device_info_keys
         ]
 
-        frequency_keys = [
-            "iot.freq",
-        ]
-
-        frequency_sensors = [
-            FrequencySensorEntity(api, self, key)
-            for key in frequency_keys
-            if key in device_info_keys
-        ]
-
         power_keys = [
             "iot.consWatt",
             "iot.geneWatt",
@@ -97,30 +77,13 @@ class SmartPlug(BaseDevice):
             if key in device_info_keys
         ]
 
-        temperature_keys = [
-            "iot.temp",
-        ]
-
-        temperature_sensors = [
-            TemperateSensorEntity(api, self, key)
-            for key in temperature_keys
-            if key in device_info_keys
-        ]
-
-        voltage_keys = [
-            "iot.volt",
-        ]
-
-        voltage_sensors = [
-            VoltageSensorEntity(api, self, key)
-            for key in voltage_keys
-            if key in device_info_keys
-        ]
-
         ignored_keys = [
             "iot.20_1",
             "iot.20_134",
             "iot.brightness",
+            "iot.freq",
+            "iot.resetCount",
+            "iot.runTime",
             "iot.switchSta",
             "iot.task1",
             "iot.task2",
@@ -133,18 +96,11 @@ class SmartPlug(BaseDevice):
             "iot.task9",
             "iot.task10",
             "iot.task11",
+            "iot.temp",
+            "iot.volt",
         ]
 
-        found_keys = set(
-            count_keys
-            + current_keys
-            + duration_keys
-            + frequency_keys
-            + ignored_keys
-            + power_keys
-            + temperature_keys
-            + voltage_keys
-        )
+        found_keys = set(current_keys + duration_keys + ignored_keys + power_keys)
 
         diagnostic_keys = device_info_keys - found_keys
 
@@ -153,14 +109,14 @@ class SmartPlug(BaseDevice):
             for key in diagnostic_keys
         ]
         return [
-            *count_sensors,
+            CountSensorEntity(api, self, "iot.resetCount"),
             *current_sensors,
             *diagnostic_sensors,
             *duration_sensors,
-            *frequency_sensors,
+            FrequencySensorEntity(api, self, "iot.freq"),
             *power_sensors,
-            *temperature_sensors,
-            *voltage_sensors,
+            TemperateSensorEntity(api, self, "iot.temp"),
+            VoltageSensorEntity(api, self, "iot.volt"),
         ]
 
     def switches(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[SwitchEntity]:
