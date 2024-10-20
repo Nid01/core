@@ -188,9 +188,9 @@ class ChargingStateSensorEntity(BaseSensorEntity):
 
     def _update_value(self, val: Any) -> bool:
         if val == 0:
-            return super()._update_value("unused")
-        if val == 1:
             return super()._update_value("charging")
+        if val == 1:
+            return super()._update_value("unused")
         if val == 2:
             return super()._update_value("discharging")
         return super()._update_value(val)
