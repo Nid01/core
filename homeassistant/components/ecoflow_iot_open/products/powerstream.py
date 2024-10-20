@@ -250,6 +250,7 @@ class PowerStream(BaseDevice):
             "iot.task10",
             "iot.task11",
             "iot.upperLimit",
+            "status",
         ]
 
         found_keys = set(

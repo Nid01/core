@@ -99,6 +99,7 @@ class SmartPlug(BaseDevice):
             "iot.task11",
             "iot.temp",
             "iot.volt",
+            "status",
         ]
 
         found_keys = set(current_keys + ignored_keys + power_keys + timestamp_keys)
