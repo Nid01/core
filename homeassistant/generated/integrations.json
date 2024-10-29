@@ -1467,6 +1467,12 @@
       "config_flow": true,
       "iot_class": "cloud_push"
     },
+    "ecoflow_iot_open": {
+      "name": "EcoFlow IoT Open",
+      "integration_type": "hub",
+      "config_flow": true,
+      "iot_class": "cloud_push"
+    },
     "ecoforest": {
       "name": "Ecoforest",
       "integration_type": "hub",
