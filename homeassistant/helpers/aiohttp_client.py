@@ -9,7 +9,7 @@ import socket
 from ssl import SSLContext
 import sys
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Self
 
 import aiohttp
 from aiohttp import web
@@ -44,11 +44,13 @@ SERVER_SOFTWARE = (
     f"aiohttp/{aiohttp.__version__} Python/{sys.version_info[0]}.{sys.version_info[1]}"
 )
 
-ENABLE_CLEANUP_CLOSED = not (3, 11, 1) <= sys.version_info < (3, 11, 4)
-# Enabling cleanup closed on python 3.11.1+ leaks memory relatively quickly
-# see https://github.com/aio-libs/aiohttp/issues/7252
-# aiohttp interacts poorly with https://github.com/python/cpython/pull/98540
-# The issue was fixed in 3.11.4 via https://github.com/python/cpython/pull/104485
+ENABLE_CLEANUP_CLOSED = (3, 13, 0) <= sys.version_info < (
+    3,
+    13,
+    1,
+) or sys.version_info < (3, 12, 7)
+# Cleanup closed is no longer needed after https://github.com/python/cpython/pull/118960
+# which first appeared in Python 3.12.7 and 3.13.1
 
 WARN_CLOSE_MSG = "closes the Home Assistant aiohttp session"
 
@@ -78,6 +80,31 @@ class HassClientResponse(aiohttp.ClientResponse):
     ) -> Any:
         """Send a json request and parse the json response."""
         return await super().json(*args, loads=loads, **kwargs)
+
+
+class ChunkAsyncStreamIterator:
+    """Async iterator for chunked streams.
+
+    Based on aiohttp.streams.ChunkTupleAsyncStreamIterator, but yields
+    bytes instead of tuple[bytes, bool].
+    """
+
+    __slots__ = ("_stream",)
+
+    def __init__(self, stream: aiohttp.StreamReader) -> None:
+        """Initialize."""
+        self._stream = stream
+
+    def __aiter__(self) -> Self:
+        """Iterate."""
+        return self
+
+    async def __anext__(self) -> bytes:
+        """Yield next chunk."""
+        rv = await self._stream.readchunk()
+        if rv == (b"", False):
+            raise StopAsyncIteration
+        return rv[0]
 
 
 @callback

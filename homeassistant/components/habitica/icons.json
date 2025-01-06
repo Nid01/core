@@ -58,6 +58,20 @@
         "default": "mdi:hand-heart-outline"
       }
     },
+    "calendar": {
+      "todos": {
+        "default": "mdi:calendar-check"
+      },
+      "dailys": {
+        "default": "mdi:calendar-multiple"
+      },
+      "todo_reminders": {
+        "default": "mdi:reminder"
+      },
+      "daily_reminders": {
+        "default": "mdi:reminder"
+      }
+    },
     "sensor": {
       "display_name": {
         "default": "mdi:account-circle"
@@ -107,17 +121,23 @@
           "rogue": "mdi:ninja"
         }
       },
-      "todos": {
-        "default": "mdi:checkbox-outline"
-      },
-      "dailys": {
-        "default": "mdi:calendar-month"
-      },
       "habits": {
         "default": "mdi:contrast-box"
       },
       "rewards": {
         "default": "mdi:treasure-chest"
+      },
+      "strength": {
+        "default": "mdi:arm-flex-outline"
+      },
+      "intelligence": {
+        "default": "mdi:head-snowflake-outline"
+      },
+      "perception": {
+        "default": "mdi:eye-outline"
+      },
+      "constitution": {
+        "default": "mdi:run-fast"
       }
     },
     "switch": {
@@ -125,6 +145,14 @@
         "default": "mdi:sleep-off",
         "state": {
           "on": "mdi:sleep"
+        }
+      }
+    },
+    "binary_sensor": {
+      "pending_quest": {
+        "default": "mdi:script-outline",
+        "state": {
+          "on": "mdi:script-text-outline"
         }
       }
     }
@@ -135,6 +163,39 @@
     },
     "cast_skill": {
       "service": "mdi:creation-outline"
+    },
+    "accept_quest": {
+      "service": "mdi:script-text"
+    },
+    "reject_quest": {
+      "service": "mdi:script-text"
+    },
+    "leave_quest": {
+      "service": "mdi:script-text"
+    },
+    "abort_quest": {
+      "service": "mdi:script-text-key"
+    },
+    "cancel_quest": {
+      "service": "mdi:script-text-key"
+    },
+    "start_quest": {
+      "service": "mdi:script-text-key"
+    },
+    "score_habit": {
+      "service": "mdi:counter"
+    },
+    "score_reward": {
+      "service": "mdi:sack"
+    },
+    "transformation": {
+      "service": "mdi:flask-round-bottom"
+    },
+    "get_tasks": {
+      "service": "mdi:calendar-export",
+      "sections": {
+        "filter": "mdi:calendar-filter"
+      }
     }
   }
 }
