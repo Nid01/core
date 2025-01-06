@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from functools import cached_property
 import json
 from typing import Any
+
+from propcache import cached_property
 
 from homeassistant.components.sensor import (
     DOMAIN as SENSOR_DOMAIN,
@@ -28,8 +29,10 @@ from homeassistant.const import (
     UnitOfTime,
 )
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.device_registry import DeviceEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.util import dt as dt_util
 
 from .api import EcoFlowIoTOpenAPIInterface
 from .const import API_CLIENT, DOMAIN, PRODUCTS
@@ -643,10 +646,9 @@ class StatusSensorEntity(BaseSensorEntity):
             if self.extra_state_attributes and self.extra_state_attributes.get(
                 "last_updated"
             ):
-                time_diff = now - self.extra_state_attributes["last_updated"]
-                device_online = time_diff < timedelta(
-                    seconds=self._api.availability_check_interval_sec * 4
-                )
+                device_online = now - self.extra_state_attributes[
+                    "last_updated"
+                ] < timedelta(seconds=self._api.availability_check_interval_sec * 4)
                 if not device_online:
                     self._device.set_availability(device_online)
                     self.hass.bus.fire(
@@ -654,13 +656,34 @@ class StatusSensorEntity(BaseSensorEntity):
                     )
                     super()._update_value("assume_offline")
 
+        # When the device is assumed offline keep polling data via HTTP in case EcoFlow broke the MQTT communication with the monthly server side updates
+        if self.state == "assume_offline":
+            if isinstance(self.device_entry, DeviceEntry) and isinstance(
+                self.device_entry.serial_number, str
+            ):
+                device_quota = await self._api.getDeviceQuota(
+                    self.device_entry.serial_number
+                )
+                self._api.data_holder.update_params(
+                    device_quota, self.device_entry.serial_number
+                )
+
     def _update_value(self, val: Any) -> bool:
         self._device.set_availability(val)
         self.hass.bus.fire(f"device_{self._device.serial_number}_availability", {})
 
-        if super()._update_value("online" if val else "offline"):
-            return True
-        return False
+        # When the device is assumed offline keep polling data via HTTP in case EcoFlow broke the MQTT communication with the monthly server side updates
+        if self.state == "assume_offline" and val:
+            if self.extra_state_attributes and self.extra_state_attributes.get(
+                "last_updated"
+            ):
+                assume_offline = not dt_util.now() - self.extra_state_attributes[
+                    "last_updated"
+                ] < timedelta(seconds=self._api.availability_check_interval_sec * 4)
+                if assume_offline:
+                    return super()._update_value("assume_offline")
+
+        return super()._update_value("online" if val else "offline")
 
     @cached_property
     def icon(self) -> str | None:
