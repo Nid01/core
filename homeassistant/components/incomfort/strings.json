@@ -13,6 +13,15 @@
           "username": "The username to log into the gateway. This is `admin` in most cases.",
           "password": "The password to log into the gateway, is printed at the bottom of the Lan2RF Gateway or is `intergas` for some older devices."
         }
+      },
+      "reauth_confirm": {
+        "data": {
+          "password": "[%key:common::config_flow::data::password%]"
+        },
+        "data_description": {
+          "password": "Correct the gateway password."
+        },
+        "description": "Re-authenticate to the gateway."
       }
     },
     "abort": {
@@ -21,6 +30,7 @@
       "no_heaters": "No heaters found.",
       "not_found": "No Lan2RF gateway found.",
       "timeout_error": "Time out when connection to Lan2RF gateway.",
+      "reauth_successful": "[%key:common::config_flow::abort::reauth_successful%]",
       "unknown": "Unknown error when connection to Lan2RF gateway."
     },
     "error": {
@@ -29,6 +39,19 @@
       "not_found": "[%key:component::incomfort::config::abort::not_found%]",
       "timeout_error": "[%key:component::incomfort::config::abort::timeout_error%]",
       "unknown": "[%key:component::incomfort::config::abort::unknown%]"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Intergas InComfort Lan2RF Gateway options",
+        "data": {
+          "legacy_setpoint_status": "Legacy setpoint handling"
+        },
+        "data_description": {
+          "legacy_setpoint_status": "Some older gateway models with an older firmware versions might not update the thermostat setpoint and override settings correctly. Enable this option if you experience issues in updating the setpoint for your thermostat. It will use the actual setpoint of the thermostat instead of the override. As side effect is that it might take a few minutes before the setpoint is updated."
+        }
+      }
     }
   },
   "issues": {

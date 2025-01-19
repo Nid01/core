@@ -1144,6 +1144,11 @@
       "config_flow": false,
       "iot_class": "cloud_polling"
     },
+    "decorquip": {
+      "name": "Decorquip Dream",
+      "integration_type": "virtual",
+      "supported_by": "motion_blinds"
+    },
     "delijn": {
       "name": "De Lijn",
       "integration_type": "hub",
@@ -3310,6 +3315,12 @@
       "config_flow": true,
       "iot_class": "local_polling"
     },
+    "letpot": {
+      "name": "LetPot",
+      "integration_type": "hub",
+      "config_flow": true,
+      "iot_class": "cloud_push"
+    },
     "leviton": {
       "name": "Leviton",
       "iot_standards": [
@@ -4225,7 +4236,7 @@
     "nmbs": {
       "name": "NMBS",
       "integration_type": "hub",
-      "config_flow": false,
+      "config_flow": true,
       "iot_class": "cloud_polling"
     },
     "no_ip": {
@@ -4981,6 +4992,12 @@
       "integration_type": "service",
       "config_flow": true,
       "iot_class": "local_polling"
+    },
+    "qbus": {
+      "name": "Qbus",
+      "integration_type": "hub",
+      "config_flow": true,
+      "iot_class": "local_push"
     },
     "qingping": {
       "name": "Qingping",
