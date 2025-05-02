@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from tesla_fleet_api.const import Scope
 from teslemetry_stream import TeslemetryStreamVehicle
 from teslemetry_stream.const import TeslaLocation
 
@@ -14,7 +15,7 @@ from homeassistant.components.device_tracker.config_entry import (
 )
 from homeassistant.const import STATE_HOME
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
 from . import TeslemetryConfigEntry
@@ -68,13 +69,17 @@ DESCRIPTIONS: tuple[TeslemetryDeviceTrackerEntityDescription, ...] = (
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: TeslemetryConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up the Teslemetry device tracker platform from a config entry."""
 
     entities: list[
         TeslemetryPollingDeviceTrackerEntity | TeslemetryStreamingDeviceTrackerEntity
     ] = []
+    # Only add vehicle location entities if the user has granted vehicle location scope.
+    if Scope.VEHICLE_LOCATION not in entry.runtime_data.scopes:
+        return
+
     for vehicle in entry.runtime_data.vehicles:
         for description in DESCRIPTIONS:
             if vehicle.api.pre2021 or vehicle.firmware < description.streaming_firmware:
