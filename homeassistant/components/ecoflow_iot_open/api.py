@@ -25,20 +25,19 @@ import json
 import logging
 import os
 import random
-import ssl
 import time
-from typing import Any, Optional
+from typing import Any
 
 from aiohttp import ClientSession
-import aiomqtt
 from aiomqtt import Client, MqttCodeError
 from aiomqtt.message import Message
 from multidict import CIMultiDict
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import DOMAIN as HA_DOMAIN, HomeAssistant
+from homeassistant.core import DOMAIN as HOMEASSISTANT_DOMAIN, HomeAssistant
 from homeassistant.helpers.issue_registry import IssueSeverity, async_create_issue
 from homeassistant.util.dt import utcnow
+from homeassistant.util.ssl import get_default_context
 
 from .const import (
     DEFAULT_AVAILABILITY_CHECK_INTERVAL_SEC,
@@ -143,7 +142,7 @@ class EcoFlowIoTOpenAPIInterface:
         self._certification: dict[str, Any]
         self._max_reconnects = 3
         self._mqtt_client: Client
-        self._mqtt_listener: Optional[asyncio.Task] = None
+        self._mqtt_listener: asyncio.Task | None = None
         self._products: dict[ProductType, dict[str, Any]] = {}
         self._reconnects = 0
         self._secretKey = secretKey
@@ -311,14 +310,12 @@ class EcoFlowIoTOpenAPIInterface:
                     logger=_CLIENT_LOGGER,
                     identifier=self._get_client_id(),
                     tls_insecure=False,
-                    tls_params=aiomqtt.TLSParameters(
-                        cert_reqs=ssl.CERT_REQUIRED,
-                    ),
+                    tls_context=get_default_context(),
                 ) as client:
                     self._mqtt_client = client
                     topics_qos: list[tuple[str, int]] = [
                         (
-                            f"/open/{self._certification["certificateAccount"]}/{device.serial_number}/status",
+                            f"/open/{self._certification['certificateAccount']}/{device.serial_number}/status",
                             1,
                         )
                         for devices in self._products.values()
@@ -326,7 +323,7 @@ class EcoFlowIoTOpenAPIInterface:
                     ]
                     topics_qos += [
                         (
-                            f"/open/{self._certification["certificateAccount"]}/{device.serial_number}/quota",
+                            f"/open/{self._certification['certificateAccount']}/{device.serial_number}/quota",
                             1,
                         )
                         for devices in self._products.values()
@@ -357,13 +354,14 @@ class EcoFlowIoTOpenAPIInterface:
                             "exception": f"[ReasonCode: {exception.rc}] {exception.args}"
                         },
                     )
+                await asyncio.sleep(5)
 
     async def publish(
         self,
         serial_number: str,
         command: dict,
     ):
-        """Subscribe to MQTT topics."""
+        """Publish command to MQTT topic."""
 
         message_id = random.randint(100000, 999999)
         payload: dict[str, str | int] = {
@@ -374,7 +372,7 @@ class EcoFlowIoTOpenAPIInterface:
 
         # try:
         await self._mqtt_client.publish(
-            f"/open/{self._certification["certificateAccount"]}/{serial_number}/set",
+            f"/open/{self._certification['certificateAccount']}/{serial_number}/set",
             json.dumps(payload),
             1,
         )
@@ -509,7 +507,7 @@ class EcoFlowIoTOpenAPIInterface:
         else:
             environment = "production"
 
-        return f"{HA_DOMAIN}_{environment}_{self._accessKey}"
+        return f"{HOMEASSISTANT_DOMAIN}_{environment}_{self._accessKey}"
 
     async def _request(self, method: str, url: str, **kwargs) -> dict[str, Any]:
         """Make an HTTP request to EcoFlow's API.
@@ -528,12 +526,29 @@ class EcoFlowIoTOpenAPIInterface:
             session.request(method, url, **kwargs) as response,
         ):
             if response.status == 200:
-                response_json = await response.json()
-                sorted_response = recursively_sort_dict(response_json)
-                _LOGGER.debug(sorted_response)
-                return sorted_response
-            _LOGGER.error(response)
-            raise GenericHTTPError(response.status)
+                try:
+                    response_json = await response.json()
+                    sorted_response = recursively_sort_dict(response_json)
+                except json.JSONDecodeError as exc:
+                    _LOGGER.error(
+                        "Failed to decode JSON response from %s: %s", url, exc
+                    )
+                    raise InvalidResponseFormat(
+                        f"Invalid JSON response from {url}"
+                    ) from exc
+                else:
+                    _LOGGER.debug(
+                        "HTTP Response: %s", json.dumps(sorted_response, indent=2)
+                    )
+                    return sorted_response
+            else:
+                _LOGGER.error(
+                    "HTTP Error %s from %s: %s",
+                    response.status,
+                    url,
+                    await response.text(),
+                )
+                raise GenericHTTPError(response.status)
 
 
 def hmac_sha256(data: str, key: str) -> str:
@@ -607,7 +622,7 @@ def get_header_qstr(params: CIMultiDict[str]):
 
 
 def create_headers(
-    accessKey: str, secretKey: str, params: Optional[dict[str, str]] = None
+    accessKey: str, secretKey: str, params: dict[str, str] | None = None
 ) -> dict[str, str]:
     """Create headers with authentication information.
 
