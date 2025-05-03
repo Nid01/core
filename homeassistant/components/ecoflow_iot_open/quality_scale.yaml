@@ -1,0 +1,130 @@
+# Bronze Scale - Fundamental requirements for a basic integration
+rules:
+  action-setup:
+    status: exempt
+    comment: todo
+  appropriate-polling:
+    status: exempt
+    comment: todo
+  brands:
+    status: exempt
+    comment: todo
+  common-modules:
+    status: exempt
+    comment: todo
+  config-flow-test-coverage:
+    status: exempt
+    comment: todo
+  config-flow:
+    status: done
+    comment: todo
+  dependency-transparency:
+    status: exempt
+    comment: todo
+  docs-actions:
+    status: exempt
+    comment: todo
+  docs-high-level-description:
+    status: exempt
+    comment: todo
+  docs-installation-instructions:
+    status: exempt
+    comment: todo
+  docs-removal-instructions:
+    status: exempt
+    comment: todo
+  entity-event-setup:
+    status: exempt
+    comment: todo
+  entity-unique-id:
+    status: exempt
+    comment: todo
+  has-entity-name:
+    status: exempt
+    comment: todo
+  runtime-data:
+    status: exempt
+    comment: todo
+  test-before-configure:
+    status: exempt
+    comment: todo
+  test-before-setup:
+    status: exempt
+    comment: todo
+  unique-config-entry:
+    status: exempt
+    comment: todo
+
+  # Silver Scale - Enhancements for robustness and user experience
+  action-exceptions:
+    status: todo
+  config-entry-unloading:
+    status: todo
+  docs-configuration-parameters:
+    status: todo
+  docs-installation-parameters:
+    status: todo
+  entity-unavailable:
+    status: todo
+  integration-owner:
+    status: todo
+  log-when-unavailable:
+    status: todo
+  parallel-updates:
+    status: todo
+  reauthentication-flow:
+    status: todo
+  test-coverage:
+    status: todo
+
+  # Gold Scale - Advanced features and comprehensive documentation
+  devices:
+    status: todo
+  diagnostics:
+    status: todo
+  discovery-update-info:
+    status: todo
+  discovery:
+    status: todo
+  docs-data-update:
+    status: todo
+  docs-examples:
+    status: todo
+  docs-known-limitations:
+    status: todo
+  docs-supported-devices:
+    status: todo
+  docs-supported-functions:
+    status: todo
+  docs-troubleshooting:
+    status: todo
+  docs-use-cases:
+    status: todo
+  dynamic-devices:
+    status: todo
+  entity-category:
+    status: todo
+  entity-device-class:
+    status: todo
+  entity-disabled-by-default:
+    status: todo
+  entity-translations:
+    status: todo
+  exception-translations:
+    status: todo
+  icon-translations:
+    status: todo
+  reconfiguration-flow:
+    status: todo
+  repair-issues:
+    status: todo
+  stale-devices:
+    status: todo
+
+  # Platinum Scale - Highest level of technical excellence and integration
+  async-dependency:
+    status: todo
+  inject-websession:
+    status: todo
+  strict-typing:
+    status: todo

@@ -292,7 +292,7 @@ aiomealie==0.9.5
 aiomodernforms==0.1.8
 
 # homeassistant.components.ecoflow_iot_open
-aiomqtt==2.0.1
+aiomqtt==2.3.2
 
 # homeassistant.components.yamaha_musiccast
 aiomusiccast==0.14.8

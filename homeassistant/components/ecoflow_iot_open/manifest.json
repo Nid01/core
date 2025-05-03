@@ -3,11 +3,8 @@
   "name": "EcoFlow IoT Open",
   "codeowners": ["@Nid01"],
   "config_flow": true,
-  "dependencies": [],
   "documentation": "https://www.home-assistant.io/integrations/ecoflow_iot_open",
-  "homekit": {},
   "iot_class": "cloud_push",
-  "requirements": ["aiomqtt==2.3.0", "reactivex==4.0.4"],
-  "ssdp": [],
-  "zeroconf": []
+  "quality_scale": "bronze",
+  "requirements": ["aiomqtt==2.3.2", "reactivex==4.0.4"]
 }
