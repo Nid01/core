@@ -8,6 +8,7 @@ from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import UnitOfElectricCurrent, UnitOfTime
 
 from ..api import EcoFlowIoTOpenAPIInterface
+from ..select import SelectEntity
 from ..sensor import (
     BatterySensorEntity,
     BinaryStateSensorEntity,
@@ -481,5 +482,10 @@ class DELTAMax(BaseDevice):
 
     def numbers(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[NumberEntity]:
         """Available numbers for DELTA Max."""
+
+        return []
+
+    def selects(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[SelectEntity]:
+        """Available selects for DELTA Max."""
 
         return []

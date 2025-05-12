@@ -5,7 +5,13 @@ from collections.abc import Sequence
 from homeassistant.const import UnitOfTime
 
 from ..api import EcoFlowIoTOpenAPIInterface
-from ..number import BaseNumberEntity, BatteryLevelEntity, BrightnessEntity, PowerEntity
+from ..number import (
+    BaseNumberEntity,
+    BatteryNumberEntity,
+    BrightnessNumberEntity,
+    PowerNumberEntity,
+)
+from ..select import SelectEntity
 from ..sensor import (
     BaseSensorEntity,
     BatterySensorEntity,
@@ -303,7 +309,7 @@ class PowerStream(BaseDevice):
         """Available numbers for PowerStream."""
 
         return [
-            PowerEntity(
+            PowerNumberEntity(
                 api,
                 self,
                 "iot.permanentWatts",
@@ -314,7 +320,7 @@ class PowerStream(BaseDevice):
                     "params": {"permanentWatts": value * 10},
                 },
             ),
-            BatteryLevelEntity(
+            BatteryNumberEntity(
                 api,
                 self,
                 "iot.lowerLimit",
@@ -325,7 +331,7 @@ class PowerStream(BaseDevice):
                     "params": {"lowerLimit": value},
                 },
             ),
-            BatteryLevelEntity(
+            BatteryNumberEntity(
                 api,
                 self,
                 "iot.upperLimit",
@@ -336,7 +342,7 @@ class PowerStream(BaseDevice):
                     "params": {"upperLimit": value},
                 },
             ),
-            BrightnessEntity(
+            BrightnessNumberEntity(
                 api,
                 self,
                 "iot.invBrightness",
@@ -351,3 +357,8 @@ class PowerStream(BaseDevice):
 
     # def datetimes(...)..
     # DateTimeEntity(dataHolder, self, "iot.updateTime"),
+
+    def selects(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[SelectEntity]:
+        """Available selects for PowerStream."""
+
+        return []

@@ -3,17 +3,17 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+import logging
 from typing import Any
-
-from propcache.api import cached_property
 
 from homeassistant.components.number import (
     DOMAIN as NUMBER_DOMAIN,
     NumberEntity,
     NumberMode,
 )
+from homeassistant.components.select import DOMAIN as SELECT_DOMAIN
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import PERCENTAGE, UnitOfPower
+from homeassistant.const import DEGREE, LIGHT_LUX, PERCENTAGE, UnitOfPower
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
@@ -21,6 +21,8 @@ from .api import EcoFlowIoTOpenAPIInterface
 from .const import API_CLIENT, DOMAIN, PRODUCTS
 from .entity import EcoFlowBaseCommandEntity
 from .products import BaseDevice, ProductType
+
+_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
@@ -72,14 +74,11 @@ class BaseNumberEntity(NumberEntity, EcoFlowBaseCommandEntity):
     def _update_value(self, val: Any) -> bool:
         if self._attr_native_value != val:
             self._attr_native_value = val
-
-            if hasattr(self, "icon"):
-                del self.icon  # invalidate cached icon because doesn't update properly
             return True
         return False
 
 
-class ValueUpdateEntity(BaseNumberEntity):
+class ValueUpdateNumberEntity(BaseNumberEntity):
     """Number value update entity."""
 
     _attr_native_step = 1
@@ -87,23 +86,34 @@ class ValueUpdateEntity(BaseNumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         """Set the value."""
-        # if self._command:
-        ival = int(value)
-        await self.send_set_message(ival, self.command_dict(ival))
+        await self.send_set_message(int(value), self.command_dict(int(value)))
 
 
-class LevelEntity(ValueUpdateEntity):
+class AngleNumberEntity(ValueUpdateNumberEntity):
+    """Angle number entity."""
+
+    _attr_icon = "mdi:format-text-rotation-angle-up"
+
+    _attr_native_unit_of_measurement = DEGREE
+    _attr_native_step = 1
+    _attr_mode = NumberMode.BOX
+
+    def _update_value(self, val: Any) -> bool:
+        return super()._update_value(val + 10)
+
+
+class LevelNumberEntity(ValueUpdateNumberEntity):
     """Level number entity."""
 
     _attr_native_unit_of_measurement = PERCENTAGE
 
 
-class BatteryLevelEntity(LevelEntity):
+class BatteryNumberEntity(LevelNumberEntity):
     """Battery level number entity."""
 
     _attr_icon = "battery-charging-100"
 
-    @cached_property
+    @property
     def icon(self) -> str:
         """Icon for battery level."""
         if isinstance(self.state, int):
@@ -117,7 +127,7 @@ class BatteryLevelEntity(LevelEntity):
         return "mdi:battery-charging-100"
 
 
-class BrightnessEntity(LevelEntity):
+class BrightnessNumberEntity(LevelNumberEntity):
     """Brightness level number entity."""
 
     _attr_icon = "mdi:lightbulb-on"
@@ -125,7 +135,7 @@ class BrightnessEntity(LevelEntity):
     def _update_value(self, val: Any) -> bool:
         return super()._update_value(round(max(0, min(100, val / 1023 * 100))))
 
-    @cached_property
+    @property
     def icon(self) -> str:
         """Icon for brightness level."""
         if isinstance(self.state, int):
@@ -137,7 +147,64 @@ class BrightnessEntity(LevelEntity):
         return "mdi:lightbulb-on"
 
 
-class PowerEntity(ValueUpdateEntity):
+class MinimumLightIntesityNumberEntity(ValueUpdateNumberEntity):
+    """Minimum light intensity number entity."""
+
+    _attr_icon = "mdi:brightness-1"
+
+    _attr_native_unit_of_measurement = LIGHT_LUX
+    _attr_native_step = 5000
+    _attr_mode = NumberMode.BOX
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Set the value."""
+        value = int(value)
+
+        # Check if device_entry is valid
+        if not self.device_entry or not self.device_entry.name:
+            _LOGGER.error(
+                "Device entry or device name is missing for entity %s", self.entity_id
+            )
+            return
+
+        # Get the state of the related select entity
+        state = self.hass.states.get(
+            f"{SELECT_DOMAIN}.{self.device_entry.name.replace(' ', '_').lower()}_iot_lightsen"
+        )
+
+        if state and "options" in state.attributes:
+            try:
+                # Find the index of the current state in the options list
+                index = list(state.attributes["options"]).index(state.state)
+                await self.send_set_message(value, self.command_dict({value, index}))
+            except ValueError:
+                _LOGGER.error(
+                    "State '%s' not found in options for entity %s",
+                    state.state,
+                    state.entity_id,
+                )
+        else:
+            _LOGGER.error("State or options not found for entity %s", self.entity_id)
+
+    @property
+    def icon(self) -> str:
+        """Icon for minimum light intensity."""
+
+        if isinstance(self.state, int):
+            if self.state == 10000:
+                return "mdi:brightness-1"
+            if self.state == 15000:
+                return "mdi:brightness-5"
+            if self.state == 20000:
+                return "mdi:brightness-6"
+            if self.state == 25000:
+                return "mdi:brightness-4"
+            if self.state == 30000:
+                return "mdi:brightness-7"
+        return "mdi:brightness-1"
+
+
+class PowerNumberEntity(ValueUpdateNumberEntity):
     """Power number entity."""
 
     _attr_icon = "mdi:flash"  # "mdi:transmission-tower-import"

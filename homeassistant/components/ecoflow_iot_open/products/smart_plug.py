@@ -8,7 +8,8 @@ from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import UnitOfTime
 
 from ..api import EcoFlowIoTOpenAPIInterface
-from ..number import BrightnessEntity
+from ..number import BrightnessNumberEntity
+from ..select import SelectEntity
 from ..sensor import (
     CountSensorEntity,
     CurrentSensorEntity,
@@ -142,7 +143,7 @@ class SmartPlug(BaseDevice):
         """Available numbers for Smart Plug."""
 
         return [
-            BrightnessEntity(
+            BrightnessNumberEntity(
                 api,
                 self,
                 "iot.brightness",
@@ -154,3 +155,7 @@ class SmartPlug(BaseDevice):
                 },
             )
         ]
+
+    def selects(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[SelectEntity]:
+        """Available selects for Smart Plug."""
+        return []

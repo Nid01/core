@@ -104,9 +104,6 @@ class BaseSensorEntity(SensorEntity, EcoFlowBaseEntity):
     def _update_value(self, val: Any) -> bool:
         if self._attr_native_value != val:
             self._attr_native_value = val
-
-            if hasattr(self, "icon"):
-                del self.icon  # invalidate cached icon because doesn't update properly
             return True
         return False
 
@@ -160,7 +157,7 @@ class BinaryStateSensorEntity(BaseSensorEntity):
             return super()._update_value("On")
         return super()._update_value("Off")
 
-    @cached_property
+    @property
     def icon(self) -> str:
         """Icon for binary state in context of mqtt key."""
         if self._attr_name in ("beeper", "pd.beepState"):
@@ -197,11 +194,9 @@ class ChargingStateSensorEntity(BaseSensorEntity):
 
     def _update_value(self, val: Any) -> bool:
         if val == 0:
-            return super()._update_value("unused")
+            return super()._update_value("discharging")
         if val == 1:
             return super()._update_value("charging")
-        if val == 2:
-            return super()._update_value("discharging")
         return super()._update_value(val)
 
 
@@ -248,7 +243,7 @@ class CyclesSensorEntity(BaseSensorEntity):
     _attr_state_class = SensorStateClass.TOTAL_INCREASING
 
 
-class DegreeSensorEntity(BaseSensorEntity):
+class AngleSensorEntity(BaseSensorEntity):
     """Sensor for angle."""
 
     # _attr_entity_category = EntityCategory.DIAGNOSTIC
@@ -360,7 +355,7 @@ class IlluminanceSensorEntity(BaseSensorEntity):
     _attr_state_class = SensorStateClass.MEASUREMENT
     # _attr_native_value = 0
 
-    @cached_property
+    @property
     def icon(self) -> str:
         """Lux grade icon handling."""
 
@@ -393,7 +388,7 @@ class IlluminanceGradeSensorEntity(BaseSensorEntity):
             return super()._update_value("very strong")
         return super()._update_value(val)
 
-    @cached_property
+    @property
     def icon(self) -> str:
         """Lux grade icon handling."""
 
@@ -406,19 +401,6 @@ class IlluminanceGradeSensorEntity(BaseSensorEntity):
         if self.state in (3, "very strong"):
             return "mdi:brightness-7"
         return "mdi:brightness-5"
-
-
-class ModeSensorEntity(BaseSensorEntity):
-    """Sensor for mode."""
-
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-
-    def _update_value(self, val: Any) -> bool:
-        if val == 0:
-            return super()._update_value("Manual")
-        if val == 1:
-            return super()._update_value("Auto")
-        return super()._update_value(val)
 
 
 class ModeAsWordSensorEntity(BaseSensorEntity):
@@ -554,43 +536,6 @@ class ProductInfoDetailSensorEntity(BaseSensorEntity):
         return super()._update_value(val[self._list_position].get(self._mqtt_key2))
 
 
-# TODO Merge ProtectionSensorEntities # pylint: disable=fixme
-class ProtectionFromRainSensorEntity(BaseSensorEntity):
-    """Sensor for rain protection."""
-
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-
-    def _update_value(self, val: Any) -> bool:
-        if val & (1 << 1):
-            return super()._update_value("On")
-        return super()._update_value("Off")
-
-    @cached_property
-    def icon(self) -> str:
-        """Icon for rain protection sensor."""
-        if self.state == "On":
-            return "mdi:umbrella-outline"
-        return "mdi:umbrella-closed-variant"
-
-
-class ProtectionFromWindSensorEntity(BaseSensorEntity):
-    """Sensor for wind protection."""
-
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-
-    def _update_value(self, val: Any) -> bool:
-        if val & (1 << 2):
-            return super()._update_value("On")
-        return super()._update_value("Off")
-
-    @cached_property
-    def icon(self) -> str:
-        """Icon for wind protection sensor."""
-        if self.state == "On":
-            return "mdi:windsock"
-        return "mdi:weather-windy"
-
-
 class ScenesSensorEntity(BaseSensorEntity):
     """Sensor for scene."""
 
@@ -603,7 +548,7 @@ class ScenesSensorEntity(BaseSensorEntity):
             return super()._update_value("Courtyard")
         return super()._update_value(val)
 
-    @cached_property
+    @property
     def icon(self) -> str | None:
         """Scenes icon handling."""
 
@@ -685,7 +630,7 @@ class StatusSensorEntity(BaseSensorEntity):
 
         return super()._update_value("online" if val else "offline")
 
-    @cached_property
+    @property
     def icon(self) -> str | None:
         """Device status icon handling."""
 

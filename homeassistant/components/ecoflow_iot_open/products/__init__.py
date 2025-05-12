@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from homeassistant.components.number import NumberEntity
+from homeassistant.components.select import SelectEntity
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.components.switch import SwitchEntity
 
@@ -57,6 +58,10 @@ class BaseDevice(ABC):
     @abstractmethod
     def numbers(self, api) -> Sequence[NumberEntity]:  # Sequence[BaseNumberEntity]:
         """Return a empty list of NumberEntity."""
+
+    @abstractmethod
+    def selects(self, api) -> Sequence[SelectEntity]:  # Sequence[BaseSelectEntity]:
+        """Return a empty list of SelectEntity."""
 
     @staticmethod
     def _get_productType_for_sn_prefix(value: str) -> ProductType:
