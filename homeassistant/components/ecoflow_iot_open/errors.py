@@ -7,11 +7,11 @@ class EcoFlowIoTOpenError(HomeAssistantError):
     """Custom exception for EcoFlow IoT Open API errors."""
 
 
-class CannotConnect(HomeAssistantError):
+class CannotConnect(EcoFlowIoTOpenError):
     """Error to indicate we cannot connect."""
 
 
-class InvalidAuth(HomeAssistantError):
+class InvalidAuth(EcoFlowIoTOpenError):
     """Error to indicate there is invalid auth."""
 
 

@@ -42,6 +42,10 @@ class BaseDevice(ABC):
         keys.remove("sn")
         return keys
 
+    async def prepare_protobuf_message(self, command: dict[str, Any]) -> bytes | None:
+        """Prepare the protobuf message for the device."""
+        return None
+
     @abstractmethod
     def sensors(self, api) -> Sequence[SensorEntity]:  # Sequence[BaseSensorEntity]:
         """Return a empty list of SensorEntityDescription."""

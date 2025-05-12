@@ -11,9 +11,12 @@ from homeassistant.exceptions import ConfigEntryNotReady
 from .api import EcoFlowIoTOpenAPIInterface
 from .const import (
     API_CLIENT,
-    CONF_ACCESS_KEY,
-    CONF_BASE_URL,
-    CONF_SECRET_KEY,
+    CONF_APP_PASSWORD,
+    CONF_APP_SERVER,
+    CONF_APP_USERNAME,
+    CONF_OPEN_ACCESS_KEY,
+    CONF_OPEN_BASE_URL,
+    CONF_OPEN_SECRET_KEY,
     DATA_HOLDER,
     DOMAIN,
     OPTS_AVAILABILITY_CHECK_INTERVAL_SEC,
@@ -32,6 +35,7 @@ _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [
     Platform.NUMBER,
+    Platform.SELECT,
     Platform.SENSOR,
     Platform.SWITCH,
 ]
@@ -46,9 +50,12 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     try:
         api = EcoFlowIoTOpenAPIInterface(
             hass,
-            config_entry.data[CONF_ACCESS_KEY],
-            config_entry.data[CONF_SECRET_KEY],
-            config_entry.data[CONF_BASE_URL],
+            config_entry.data[CONF_OPEN_ACCESS_KEY],
+            config_entry.data[CONF_OPEN_SECRET_KEY],
+            config_entry.data[CONF_OPEN_BASE_URL],
+            config_entry.data[CONF_APP_USERNAME],
+            config_entry.data[CONF_APP_PASSWORD],
+            config_entry.data[CONF_APP_SERVER],
             config_entry.options[OPTS_AVAILABILITY_CHECK_INTERVAL_SEC],
         )
         await api.certification()

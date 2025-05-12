@@ -10,13 +10,21 @@ DEVICES = "devices"
 ECOFLOW = "EcoFlow"
 
 
-CONF_ACCESS_KEY = "accessKey"
-DESCRIPTION_ACCESS_KEY = "Enter your access key. Your credentials need to be generated at https://developer.ecoflow.com/"
-CONF_SECRET_KEY = "secretKey"
-DESCRIPTION_SECRET_KEY = "Enter your secret key. Your credentials need to be generated at https://developer.ecoflow.com/"
-CONF_SERVER_REGION = "server region"
-CONF_BASE_URL = "base url"
-DESCRIPTION_SERVER_REGION = "Select the server region."
+CONF_OPEN_ACCESS_KEY = "accessKey"
+DESCRIPTION_OPEN_ACCESS_KEY = "Enter your access key. Your credentials need to be generated at https://developer.ecoflow.com/"
+CONF_OPEN_SECRET_KEY = "secretKey"
+DESCRIPTION_OPEN_SECRET_KEY = "Enter your secret key. Your credentials need to be generated at https://developer.ecoflow.com/"
+CONF_OPEN_SERVER_REGION = "open server region"
+CONF_OPEN_BASE_URL = "base url"
+DESCRIPTION_OPEN_SERVER_REGION = "Select the server region."
+
+CONF_APP_USERNAME = "username"
+DESCRIPTION_APP_USERNAME = "Enter your EcoFlow app username. This is the email address you use to log in to the EcoFlow app."
+CONF_APP_PASSWORD = "password"
+DESCRIPTION_APP_PASSWORD = "Enter your EcoFlow app password. This is the password you use to log in to the EcoFlow app."
+CONF_APP_SERVER = "app server"
+DESCRIPTION_APP_SERVER = "Enter the server for the EcoFlow app. This is usually api.ecoflow.com, but may be different for some users."
+
 
 OPTS_AVAILABILITY_CHECK_INTERVAL_SEC = "availability_check_interval_sec"
 

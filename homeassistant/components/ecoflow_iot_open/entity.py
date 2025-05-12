@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from collections.abc import Callable, Mapping
+import logging
 from typing import Any, Self
 
 from propcache.api import cached_property
@@ -13,8 +14,10 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 
 from .api import EcoFlowIoTOpenAPIInterface
-from .const import DOMAIN, ECOFLOW
+from .const import DOMAIN, ECOFLOW, SINGLE_AXIS_SOLAR_TRACKER
 from .products import BaseDevice
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class EcoFlowBaseEntity(Entity):
@@ -156,7 +159,7 @@ class EcoFlowBaseCommandEntity(EcoFlowBaseEntity):
         api: EcoFlowIoTOpenAPIInterface,
         device: BaseDevice,
         mqtt_key: str,
-        command: Callable[[int], dict[str, Any]],
+        command: Callable[..., dict[str, Any]],
         title: str = "",
         enabled: bool = True,
         auto_enable: bool = False,
@@ -167,15 +170,23 @@ class EcoFlowBaseCommandEntity(EcoFlowBaseEntity):
 
     async def send_set_message(self, target_value: Any, command: dict):
         """Send set message for EcoFlow device."""
-        await self._api.publish(self.serial_number, command)
+        if self.serial_number.startswith(SINGLE_AXIS_SOLAR_TRACKER):
+            protobuf_message = await self._device.prepare_protobuf_message(command)
+            if protobuf_message is not None:
+                await self._api.publish_app(self.serial_number, protobuf_message)
+            else:
+                _LOGGER.error("Failed to send message: protobuf_message is None")
+        else:
+            await self._api.publish_open(self.serial_number, command)
 
-    def command_dict(self, value: int) -> dict[str, Any]:
+    def command_dict(self, value: int | set[int]) -> dict[str, Any]:
         """Return command dictionary."""
-        # if self._command:
-        # p_count = len(inspect.signature(self._command).parameters)
-        # if p_count == 1:
-        return self._command(value)
-        # if p_count == 2:
-        #     return self._command(value, self._api.data_holder.params)
-
-        # return None
+        if isinstance(value, set):
+            if len(value) != 2:
+                raise ValueError("Set must contain exactly two integers")
+            value, value2 = value
+            if callable(self._command):
+                return self._command(value, value2)  # Pass two arguments
+        elif callable(self._command):
+            return self._command(value)  # Pass a single argument
+        raise TypeError("Invalid command callable or value type")

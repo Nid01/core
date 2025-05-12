@@ -5,10 +5,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from aiohttp import ClientError
 import voluptuous as vol
 
-from homeassistant.auth import InvalidAuthError
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -19,32 +17,49 @@ from homeassistant.core import HomeAssistant, callback
 
 from .api import EcoFlowIoTOpenAPIInterface
 from .const import (
-    CONF_ACCESS_KEY,
-    CONF_BASE_URL,
-    CONF_SECRET_KEY,
-    CONF_SERVER_REGION,
+    CONF_APP_PASSWORD,
+    CONF_APP_SERVER,
+    CONF_APP_USERNAME,
+    CONF_OPEN_ACCESS_KEY,
+    CONF_OPEN_BASE_URL,
+    CONF_OPEN_SECRET_KEY,
+    CONF_OPEN_SERVER_REGION,
     DEFAULT_AVAILABILITY_CHECK_INTERVAL_SEC,
-    DESCRIPTION_ACCESS_KEY,
-    DESCRIPTION_SECRET_KEY,
-    DESCRIPTION_SERVER_REGION,
+    DESCRIPTION_APP_PASSWORD,
+    DESCRIPTION_APP_SERVER,
+    DESCRIPTION_APP_USERNAME,
+    DESCRIPTION_OPEN_ACCESS_KEY,
+    DESCRIPTION_OPEN_SECRET_KEY,
+    DESCRIPTION_OPEN_SERVER_REGION,
     DOMAIN,
     OPTS_AVAILABILITY_CHECK_INTERVAL_SEC,
 )
-from .errors import CannotConnect, InvalidCredentialsError
+from .errors import ClientError, EcoFlowIoTOpenError, InvalidCredentialsError
 
 _LOGGER = logging.getLogger(__name__)
 
-SERVER_CHOICES = ["EU", "US"]
-DEFAULT_SERVER = "EU"
+OPEN_SERVER_CHOICES = ["EU", "US"]
+OPEN_DEFAULT_SERVER = "EU"
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_ACCESS_KEY, description=DESCRIPTION_ACCESS_KEY): str,
-        vol.Required(CONF_SECRET_KEY, description=DESCRIPTION_SECRET_KEY): str,
         vol.Required(
-            CONF_SERVER_REGION,
-            description=DESCRIPTION_SERVER_REGION,
-        ): vol.In(SERVER_CHOICES),
+            CONF_OPEN_ACCESS_KEY, description=DESCRIPTION_OPEN_ACCESS_KEY
+        ): str,
+        vol.Required(
+            CONF_OPEN_SECRET_KEY, description=DESCRIPTION_OPEN_SECRET_KEY
+        ): str,
+        vol.Required(
+            CONF_OPEN_SERVER_REGION,
+            description=DESCRIPTION_OPEN_SERVER_REGION,
+        ): vol.In(OPEN_SERVER_CHOICES),
+        vol.Required(CONF_APP_USERNAME, description=DESCRIPTION_APP_USERNAME): str,
+        vol.Required(CONF_APP_PASSWORD, description=DESCRIPTION_APP_PASSWORD): str,
+        vol.Required(
+            CONF_APP_SERVER,
+            default="https://api.ecoflow.com",
+            description=DESCRIPTION_APP_SERVER,
+        ): str,
     }
 )
 
@@ -53,36 +68,40 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     """Validate the user input allows us to connect."""
     errors: dict[str, str] = {}
 
-    if data[CONF_SERVER_REGION] == "EU":
-        data[CONF_BASE_URL] = "https://api-e.ecoflow.com/iot-open"
-    elif data[CONF_SERVER_REGION] == "US":
-        data[CONF_BASE_URL] = "https://api-a.ecoflow.com/iot-open"
+    if data[CONF_OPEN_SERVER_REGION] == "EU":
+        regional_url_part = "e"
+    elif data[CONF_OPEN_SERVER_REGION] == "US":
+        regional_url_part = "a"
     else:
-        errors[CONF_SERVER_REGION] = "invalid_server_region"
+        errors[CONF_OPEN_SERVER_REGION] = "invalid_server_region"
         return errors
+
+    data[CONF_OPEN_BASE_URL] = f"https://api-{regional_url_part}.ecoflow.com/iot-open"
 
     try:
         api = EcoFlowIoTOpenAPIInterface(
             hass,
-            data[CONF_ACCESS_KEY],
-            data[CONF_SECRET_KEY],
-            data[CONF_BASE_URL],
+            data[CONF_OPEN_ACCESS_KEY],
+            data[CONF_OPEN_SECRET_KEY],
+            data[CONF_OPEN_BASE_URL],
+            data[CONF_APP_USERNAME],
+            data[CONF_APP_PASSWORD],
+            data[CONF_APP_SERVER],
         )
         await api.certification()
 
     except ClientError:
-        _LOGGER.debug("Cannot connect", exc_info=True)
         errors["base"] = "cannot_connect"
     except InvalidCredentialsError:
         errors["base"] = "invalid_credentials"
-    except Exception:  # pylint: disable=broad-except
-        _LOGGER.exception("Unexpected exception", stack_info=True)
-        errors["base"] = "unhandled"
+    except EcoFlowIoTOpenError as error:
+        _LOGGER.exception("Unexpected exception")
+        errors["base"] = f"unhandled error: {error.args}"
 
     if errors:
         return errors
 
-    return {"title": "EcoFlow IoT Open"}
+    return {}
 
 
 class EcoFlowIoTOpenConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -98,27 +117,34 @@ class EcoFlowIoTOpenConfigFlow(ConfigFlow, domain=DOMAIN):
         """Handle the initial step."""
 
         errors: dict[str, str] = {}
-        if user_input is not None:
-            try:
-                info = await validate_input(self.hass, user_input)
-            except CannotConnect:
-                errors["base"] = "cannot_connect"
-            except InvalidAuthError:
-                errors["base"] = "invalid_auth"
-            except Exception:  # pylint: disable=broad-except
-                _LOGGER.exception("Unexpected exception")
-                errors["base"] = "unknown"
-            else:
-                options = {
-                    OPTS_AVAILABILITY_CHECK_INTERVAL_SEC: DEFAULT_AVAILABILITY_CHECK_INTERVAL_SEC
-                }
+        if user_input is None:
+            return self.async_show_form(
+                step_id="user", data_schema=STEP_USER_DATA_SCHEMA
+            )
 
-                return self.async_create_entry(
-                    title=info["title"], data=user_input, options=options
-                )
+        self._async_abort_entries_match(
+            {
+                CONF_OPEN_ACCESS_KEY: user_input[CONF_OPEN_ACCESS_KEY],
+                CONF_OPEN_SECRET_KEY: user_input[CONF_OPEN_SECRET_KEY],
+                CONF_OPEN_SERVER_REGION: user_input[CONF_OPEN_SERVER_REGION],
+                CONF_APP_USERNAME: user_input[CONF_APP_USERNAME],
+                CONF_APP_PASSWORD: user_input[CONF_APP_PASSWORD],
+                CONF_APP_SERVER: user_input[CONF_APP_SERVER],
+            }
+        )
+
+        if not (errors := await validate_input(self.hass, user_input)):
+            options = {
+                OPTS_AVAILABILITY_CHECK_INTERVAL_SEC: DEFAULT_AVAILABILITY_CHECK_INTERVAL_SEC
+            }
+            return self.async_create_entry(
+                title="EcoFlow IoT Open", data=user_input, options=options
+            )
 
         return self.async_show_form(
-            step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
+            step_id="user",
+            data_schema=STEP_USER_DATA_SCHEMA,
+            errors=errors,
         )
 
     @staticmethod
