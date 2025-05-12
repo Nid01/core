@@ -1,24 +1,25 @@
 """EcoFlow IoT Open switch module."""
 
 from collections.abc import Callable
-from functools import cached_property
 from typing import Any
+
+from propcache.api import cached_property
 
 from homeassistant.components.switch import DOMAIN as SWITCH_DOMAIN, SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .api import EcoFlowIoTOpenAPIInterface
 from .const import API_CLIENT, DOMAIN, PRODUCTS, ProductType
-from .entities import EcoFlowBaseCommandEntity
+from .entity import EcoFlowBaseCommandEntity
 from .products import BaseDevice
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up switch based on a config entry."""
 

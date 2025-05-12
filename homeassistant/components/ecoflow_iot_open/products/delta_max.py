@@ -475,7 +475,7 @@ class DELTAMax(BaseDevice):
             #         "moduleType": 1,
             #         "operateType": "quietCfg",
             #         "params": {"enabled": value},
-            #     },  # type: ignore
+            #     },
             # )
         ]
 

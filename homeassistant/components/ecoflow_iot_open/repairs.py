@@ -10,7 +10,7 @@ from homeassistant import data_entry_flow
 from homeassistant.components.repairs import ConfirmRepairFlow, RepairsFlow
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.issue_registry import async_get as async_get_issue_registry
+import homeassistant.helpers.issue_registry as ir
 
 from .api import EcoFlowIoTOpenAPIInterface
 from .const import API_CLIENT, DOMAIN
@@ -33,7 +33,7 @@ class EcoFlowIoTOpenRepairFlow(RepairsFlow):
 
     @callback
     def _async_get_placeholders(self) -> dict[str, str]:
-        issue_registry = async_get_issue_registry(self.hass)
+        issue_registry = ir.async_get(self.hass)
         description_placeholders = {}
         if issue := issue_registry.async_get_issue(self.handler, self.issue_id):
             description_placeholders = issue.translation_placeholders or {}

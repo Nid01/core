@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from functools import cached_property
 from typing import Any
+
+from propcache.api import cached_property
 
 from homeassistant.components.number import (
     DOMAIN as NUMBER_DOMAIN,
@@ -14,18 +15,18 @@ from homeassistant.components.number import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PERCENTAGE, UnitOfPower
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .api import EcoFlowIoTOpenAPIInterface
 from .const import API_CLIENT, DOMAIN, PRODUCTS
-from .entities import EcoFlowBaseCommandEntity
+from .entity import EcoFlowBaseCommandEntity
 from .products import BaseDevice, ProductType
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up numbers based on a config entry."""
 
