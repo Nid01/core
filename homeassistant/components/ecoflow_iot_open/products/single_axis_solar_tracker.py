@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
+from homeassistant.components.button import ButtonEntity
 from homeassistant.components.number import NumberEntity
 from homeassistant.components.select import SelectEntity
 from homeassistant.components.sensor import SensorEntity
@@ -11,8 +12,13 @@ from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import UnitOfTime
 
 from ..api import EcoFlowIoTOpenAPIInterface
+from ..button import TrackAgainButton
 from ..number import AngleNumberEntity, MinimumLightIntesityNumberEntity
-from ..select import LightTrackingSensitivitySelectEntity, WindSensitivitySelectEntity
+from ..select import (
+    LightTrackingSensitivitySelectEntity,
+    ScenarioSelectEntity,
+    WindSensitivitySelectEntity,
+)
 from ..sensor import (
     AngleSensorEntity,
     BatterySensorEntity,
@@ -22,6 +28,7 @@ from ..sensor import (
     IlluminanceGradeSensorEntity,
     IlluminanceSensorEntity,
     ModeAsWordSensorEntity,
+    ShakeSensorEntity,
     StatusSensorEntity,
     TemperateSensorEntity,
     WaterSensorEntity,
@@ -32,7 +39,6 @@ from ..switch import (
     BeeperSwitchEntity,
     DeviceSwitchEntity,
     RainProtectionSwitchEntity,
-    ScenarioSwitchEntity,
     WindProtectionSwitchEntity,
 )
 from . import (
@@ -77,6 +83,97 @@ class SingleAxisSolarTracker(BaseDevice):
         message = single_axis_solar_tracker_pb2.setMessage(header=header)  # type: ignore[attr-defined]
         return message.SerializeToString()
 
+    def buttons(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[ButtonEntity]:
+        """Available buttons for Single Axis Solar Tracker."""
+
+        return [
+            TrackAgainButton(
+                api,
+                self,
+                command=lambda: {
+                    "cmdId": 19,
+                    "value": 2,
+                    "dataLen": 2,
+                },
+                title="track again",
+            ),
+        ]
+
+    def numbers(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[NumberEntity]:
+        """Available numbers for Single Axis Solar Tracker."""
+
+        return [
+            AngleNumberEntity(
+                api,
+                self,
+                "iot.angleTarget",
+                min_value=10,
+                max_value=85,
+                command=lambda value: {
+                    "cmdId": 24,
+                    "value": value - 10,
+                    "dataLen": 2,
+                },
+            ),
+            MinimumLightIntesityNumberEntity(
+                api,
+                self,
+                "iot.strLux",
+                min_value=10000,
+                max_value=30000,
+                command=lambda value, value2: {
+                    "cmdId": 27,
+                    "value": value,
+                    "value2": value2,
+                    "dataLen": 6,
+                },
+                title="minimum light tracking sensitivity",
+            ),
+        ]
+
+    def selects(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[SelectEntity]:
+        """Available selects for Single Axis Solar Tracker."""
+
+        return [
+            LightTrackingSensitivitySelectEntity(
+                api,
+                self,
+                "iot.lightSen",
+                command=lambda value, value2: {
+                    "cmdId": 27,
+                    "value": value,
+                    "value2": value2,
+                    "dataLen": 6,
+                },
+                options=["low", "medium", "high"],
+                title="light tracking sensitivity",
+            ),
+            ScenarioSelectEntity(
+                api,
+                self,
+                "iot.scenes",
+                command=lambda value: {
+                    "cmdId": 17,
+                    "value": value,
+                    "dataLen": 2,
+                },
+                options=["balcony", "courtyard"],
+                title="scenario",
+            ),
+            WindSensitivitySelectEntity(
+                api,
+                self,
+                "iot.sharkSen",
+                command=lambda value: {
+                    "cmdId": 22,
+                    "value2": value,
+                    "dataLen": 2,
+                },
+                options=["low", "medium", "high"],
+                title="wind sensitivity",
+            ),
+        ]
+
     def sensors(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[SensorEntity]:
         """Available sensors for Single Axis Solar Tracker."""
 
@@ -108,10 +205,12 @@ class SingleAxisSolarTracker(BaseDevice):
             "iot.luxGrade",
             "iot.mode",
             "iot.scenes",
+            "iot.sharkSen",
             "iot.strLux",
             "iot.water",
             "iot.wind",
             "iot.word",
+            "iot.shake",
             "status",
         ]
 
@@ -141,6 +240,7 @@ class SingleAxisSolarTracker(BaseDevice):
             TemperateSensorEntity(api, self, "iot.batteryTemperature"),
             WaterSensorEntity(api, self, "iot.water"),
             WindSensorEntity(api, self, "iot.wind"),
+            ShakeSensorEntity(api, self, "iot.shake"),
         ]
 
     def switches(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[SwitchEntity]:
@@ -161,7 +261,7 @@ class SingleAxisSolarTracker(BaseDevice):
             BeeperSwitchEntity(
                 api,
                 self,
-                "iot.word",
+                "iot.switchState",
                 command=lambda value: {
                     "cmdId": 20,
                     "value": value,
@@ -172,7 +272,7 @@ class SingleAxisSolarTracker(BaseDevice):
             DeviceSwitchEntity(
                 api,
                 self,
-                "iot.switchState",
+                "iot.word",
                 command=lambda value: {
                     "cmdId": 18,
                     "value": 1 if value else 2,
@@ -191,17 +291,6 @@ class SingleAxisSolarTracker(BaseDevice):
                 },
                 title="rain protection",
             ),
-            ScenarioSwitchEntity(
-                api,
-                self,
-                "iot.scenes",
-                command=lambda value: {
-                    "cmdId": 17,
-                    "value": value,
-                    "dataLen": 2,
-                },
-                title="scenario (balcony / courtyard)",
-            ),
             WindProtectionSwitchEntity(
                 api,
                 self,
@@ -212,68 +301,5 @@ class SingleAxisSolarTracker(BaseDevice):
                     "dataLen": 2,
                 },
                 title="wind protection",
-            ),
-        ]
-
-    def numbers(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[NumberEntity]:
-        """Available numbers for Single Axis Solar Tracker."""
-
-        return [
-            AngleNumberEntity(
-                api,
-                self,
-                "iot.angleTarget",
-                min_value=10,
-                max_value=85,
-                command=lambda value: {
-                    "cmdId": 24,
-                    "value": value - 10,
-                    "dataLen": 2,
-                },
-            ),
-            MinimumLightIntesityNumberEntity(
-                api,
-                self,
-                "iot.strLux",
-                min_value=10000,
-                max_value=30000,
-                command=lambda value, value2: {  # type: ignore[misc, arg-type]
-                    "cmdId": 27,
-                    "value": value,
-                    "value2": value2,
-                    "dataLen": 6,
-                },
-                title="minimum light tracking sensitivity",
-            ),
-        ]
-
-    def selects(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[SelectEntity]:
-        """Available selects for Single Axis Solar Tracker."""
-
-        return [
-            LightTrackingSensitivitySelectEntity(
-                api,
-                self,
-                "iot.lightSen",
-                command=lambda value, value2: {  # type: ignore[misc, arg-type]
-                    "cmdId": 27,
-                    "value": value,
-                    "value2": value2,
-                    "dataLen": 6,
-                },
-                options=["low", "medium", "high"],
-                title="light tracking sensitivity",
-            ),
-            WindSensitivitySelectEntity(
-                api,
-                self,
-                "iot.sharkSen",
-                command=lambda value: {
-                    "cmdId": 22,
-                    "value2": value,
-                    "dataLen": 2,
-                },
-                options=["low", "medium", "high"],
-                title="wind sensitivity",
             ),
         ]

@@ -5,6 +5,7 @@ from collections.abc import Sequence
 import logging
 from typing import Any
 
+from homeassistant.components.button import ButtonEntity
 from homeassistant.components.number import NumberEntity
 from homeassistant.components.select import SelectEntity
 from homeassistant.components.sensor import SensorEntity
@@ -48,12 +49,8 @@ class BaseDevice(ABC):
         return None
 
     @abstractmethod
-    def sensors(self, api) -> Sequence[SensorEntity]:  # Sequence[BaseSensorEntity]:
-        """Return a empty list of SensorEntityDescription."""
-
-    @abstractmethod
-    def switches(self, api) -> Sequence[SwitchEntity]:  # Sequence[BaseSwitchEntity]:
-        """Return a empty list of SwitchEntity."""
+    def buttons(self, api) -> Sequence[ButtonEntity]:  # Sequence[BaseButtonEntity]:
+        """Return a empty list of SelectEntity."""
 
     @abstractmethod
     def numbers(self, api) -> Sequence[NumberEntity]:  # Sequence[BaseNumberEntity]:
@@ -62,6 +59,14 @@ class BaseDevice(ABC):
     @abstractmethod
     def selects(self, api) -> Sequence[SelectEntity]:  # Sequence[BaseSelectEntity]:
         """Return a empty list of SelectEntity."""
+
+    @abstractmethod
+    def sensors(self, api) -> Sequence[SensorEntity]:  # Sequence[BaseSensorEntity]:
+        """Return a empty list of SensorEntityDescription."""
+
+    @abstractmethod
+    def switches(self, api) -> Sequence[SwitchEntity]:  # Sequence[BaseSwitchEntity]:
+        """Return a empty list of SwitchEntity."""
 
     @staticmethod
     def _get_productType_for_sn_prefix(value: str) -> ProductType:

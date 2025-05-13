@@ -7,6 +7,7 @@ from typing import Any
 from homeassistant.components.number import DOMAIN as NUMBER_DOMAIN
 from homeassistant.components.select import DOMAIN as SELECT_DOMAIN, SelectEntity
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
@@ -52,7 +53,9 @@ class BaseSelectEntity(SelectEntity, EcoFlowBaseCommandEntity):
         api: EcoFlowIoTOpenAPIInterface,
         device: BaseDevice,
         mqtt_key: str,
-        command: Callable[[int], dict[str, Any]],
+        command: Callable[[], dict[str, Any]]
+        | Callable[[Any], dict[str, Any]]
+        | Callable[[Any, Any], dict[str, Any]],
         options: list[str],
         title: str = "",
         enabled: bool = True,
@@ -79,6 +82,14 @@ class BaseSelectEntity(SelectEntity, EcoFlowBaseCommandEntity):
             return True
         return False
 
+    async def async_select_option(self, option: str) -> None:
+        """Update the current selected option."""
+        if option in self._attr_options:
+            index = self._attr_options.index(option)
+            self._attr_current_option = option
+
+        await self.send_set_message(self.command_dict(index))
+
 
 class LightTrackingSensitivitySelectEntity(BaseSelectEntity):
     """Light tracking sensitivity select entity."""
@@ -99,7 +110,7 @@ class LightTrackingSensitivitySelectEntity(BaseSelectEntity):
 
             if state and state.state.isdigit():
                 await self.send_set_message(
-                    index + 1, self.command_dict({index + 1, int(state.state)})
+                    self.command_dict({index + 1, int(state.state)})
                 )
             else:
                 _LOGGER.warning(
@@ -110,14 +121,38 @@ class LightTrackingSensitivitySelectEntity(BaseSelectEntity):
     def icon(self) -> str:
         """Icon for light tracking sensitivity."""
 
-        if isinstance(self.state, int):
-            if self.state == 1:
+        if self.state in self._attr_options:
+            index = self._attr_options.index(self.state)
+            if index == 1:
                 return "mdi:brightness-5"
-            if self.state == 2:
+            if index == 2:
                 return "mdi:brightness-6"
-            if self.state == 3:
+            if index == 3:
                 return "mdi:brightness-7"
         return "mdi:brightness-5"
+
+
+class ScenarioSelectEntity(BaseSelectEntity):
+    """Scenario switch."""
+
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def _update_value(self, val: Any) -> bool:
+        if 0 <= val < len(self._attr_options):
+            if self._attr_current_option != val:
+                self._attr_current_option = self._attr_options[val]
+            return True
+        return False
+
+    @property
+    def icon(self) -> str | None:
+        """Scenes icon handling."""
+
+        if self.state in self._attr_options:
+            index = self._attr_options.index(self.state)
+            if index == 1:
+                return "mdi:angle-acute"
+        return "mdi:format-text-rotation-angle-up"
 
 
 class WindSensitivitySelectEntity(BaseSelectEntity):
@@ -131,4 +166,18 @@ class WindSensitivitySelectEntity(BaseSelectEntity):
             index = self._attr_options.index(option)
             self._attr_current_option = option
 
-        await self.send_set_message(index + 1, self.command_dict(index + 1))
+        await self.send_set_message(self.command_dict(index + 1))
+
+    @property
+    def icon(self) -> str:
+        """Icon for light tracking sensitivity."""
+
+        if self.state in self._attr_options:
+            index = self._attr_options.index(self.state)
+            if index == 0:
+                return "mdi:fan-speed-1"
+            if index == 1:
+                return "mdi:fan-speed-2"
+            if index == 2:
+                return "mdi:fan-speed-3"
+        return "mdi:fan-alert"

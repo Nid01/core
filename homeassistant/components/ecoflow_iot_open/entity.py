@@ -168,7 +168,7 @@ class EcoFlowBaseCommandEntity(EcoFlowBaseEntity):
         super().__init__(api, device, mqtt_key, title, enabled, auto_enable)
         self._command = command
 
-    async def send_set_message(self, target_value: Any, command: dict):
+    async def send_set_message(self, command: dict):
         """Send set message for EcoFlow device."""
         if self.serial_number.startswith(SINGLE_AXIS_SOLAR_TRACKER):
             protobuf_message = await self._device.prepare_protobuf_message(command)
@@ -179,7 +179,7 @@ class EcoFlowBaseCommandEntity(EcoFlowBaseEntity):
         else:
             await self._api.publish_open(self.serial_number, command)
 
-    def command_dict(self, value: int | set[int]) -> dict[str, Any]:
+    def command_dict(self, value: int | set[int] | None) -> dict[str, Any]:
         """Return command dictionary."""
         if isinstance(value, set):
             if len(value) != 2:
@@ -187,6 +187,10 @@ class EcoFlowBaseCommandEntity(EcoFlowBaseEntity):
             value, value2 = value
             if callable(self._command):
                 return self._command(value, value2)  # Pass two arguments
-        elif callable(self._command):
-            return self._command(value)  # Pass a single argument
+        elif isinstance(value, int):
+            if callable(self._command):
+                return self._command(value)  # Pass a single argument
+        else:
+            return self._command()  # Pass a no argument
+
         raise TypeError("Invalid command callable or value type")

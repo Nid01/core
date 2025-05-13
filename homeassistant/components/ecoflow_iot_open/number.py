@@ -60,7 +60,7 @@ class BaseNumberEntity(NumberEntity, EcoFlowBaseCommandEntity):
         mqtt_key: str,
         min_value: int,
         max_value: int,
-        command: Callable[[int], dict[str, Any]],
+        command: Callable[[int], dict[str, Any]] | Callable[[Any, Any], dict[str, Any]],
         title: str = "",
         enabled: bool = True,
         auto_enable: bool = False,
@@ -86,7 +86,7 @@ class ValueUpdateNumberEntity(BaseNumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         """Set the value."""
-        await self.send_set_message(int(value), self.command_dict(int(value)))
+        await self.send_set_message(self.command_dict(int(value)))
 
 
 class AngleNumberEntity(ValueUpdateNumberEntity):
@@ -176,7 +176,7 @@ class MinimumLightIntesityNumberEntity(ValueUpdateNumberEntity):
             try:
                 # Find the index of the current state in the options list
                 index = list(state.attributes["options"]).index(state.state)
-                await self.send_set_message(value, self.command_dict({value, index}))
+                await self.send_set_message(self.command_dict({value, index}))
             except ValueError:
                 _LOGGER.error(
                     "State '%s' not found in options for entity %s",

@@ -2,6 +2,7 @@
 
 from collections.abc import Sequence
 
+from homeassistant.components.button import ButtonEntity
 from homeassistant.components.number import NumberEntity
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.components.switch import SwitchEntity
@@ -36,6 +37,21 @@ class DELTAMax(BaseDevice):
         """Initialize."""
         super().__init__(device_info, api_interface)
         self._model = "DELTA Max"
+
+    def buttons(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[ButtonEntity]:
+        """Available buttons for DELTA Max."""
+
+        return []
+
+    def numbers(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[NumberEntity]:
+        """Available numbers for DELTA Max."""
+
+        return []
+
+    def selects(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[SelectEntity]:
+        """Available selects for DELTA Max."""
+
+        return []
 
     def sensors(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[SensorEntity]:
         """Available sensors for DELTA Max."""
@@ -479,13 +495,3 @@ class DELTAMax(BaseDevice):
             #     },
             # )
         ]
-
-    def numbers(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[NumberEntity]:
-        """Available numbers for DELTA Max."""
-
-        return []
-
-    def selects(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[SelectEntity]:
-        """Available selects for DELTA Max."""
-
-        return []

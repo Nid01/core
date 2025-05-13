@@ -5,7 +5,6 @@ from typing import Any
 
 from homeassistant.components.switch import DOMAIN as SWITCH_DOMAIN, SwitchEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
@@ -60,7 +59,7 @@ class BaseSwitchEntity(SwitchEntity, EcoFlowBaseCommandEntity):
         else:
             self.entity_id = f"{SWITCH_DOMAIN}.{device.device_name.replace(' ', '_').replace('-', '_').replace('.', '_')}_{mqtt_key}"
 
-        if mqtt_key in ("iot.switchState",):
+        if mqtt_key in ("iot.switchState", "iot.word"):
             unique_id = f"{device.serial_number}_{mqtt_key}_{title.replace(' ', '_').replace('-', '_').replace('.', '_')}"
         else:
             unique_id = f"{device.serial_number}_{mqtt_key}"
@@ -78,12 +77,12 @@ class BaseSwitchEntity(SwitchEntity, EcoFlowBaseCommandEntity):
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the switch."""
         # if self._command:
-        await self.send_set_message(1, self.command_dict(1))
+        await self.send_set_message(self.command_dict(1))
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the switch."""
         # if self._command:
-        await self.send_set_message(0, self.command_dict(0))
+        await self.send_set_message(self.command_dict(0))
 
 
 class AlignmentModeSwitchEntity(BaseSwitchEntity):
@@ -93,7 +92,7 @@ class AlignmentModeSwitchEntity(BaseSwitchEntity):
     def icon(self) -> str | None:
         """Return the icon to be used for this entity."""
         if self.is_on:
-            return "mdi:arrow-oscillating"
+            return "mdi:focus-auto"
         return "mdi:arrow-oscillating-off"
 
 
@@ -148,19 +147,6 @@ class RainProtectionSwitchEntity(BaseSwitchEntity):
         if self.state == "on":
             return "mdi:umbrella-outline"
         return "mdi:umbrella-closed-variant"
-
-
-class ScenarioSwitchEntity(BaseSwitchEntity):
-    """Scenario switch."""
-
-    _attr_entity_category = EntityCategory.CONFIG
-
-    @property
-    def icon(self) -> str | None:
-        """Scenes icon handling."""
-        if self.state == "on":
-            return "mdi:angle-acute"
-        return "mdi:format-text-rotation-angle-up"
 
 
 class WindProtectionSwitchEntity(BaseSwitchEntity):

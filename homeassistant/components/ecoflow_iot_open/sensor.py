@@ -599,10 +599,10 @@ class StatusSensorEntity(BaseSensorEntity):
                     self.hass.bus.fire(
                         f"device_{self._device.serial_number}_availability", {}
                     )
-                    super()._update_value("assume_offline")
+                    super()._update_value("assume online")
 
         # When the device is assumed offline keep polling data via HTTP in case EcoFlow broke the MQTT communication with the monthly server side updates
-        if self.state == "assume_offline":
+        if self.state == "assume online":
             if isinstance(self.device_entry, DeviceEntry) and isinstance(
                 self.device_entry.serial_number, str
             ):
@@ -618,15 +618,15 @@ class StatusSensorEntity(BaseSensorEntity):
         self.hass.bus.fire(f"device_{self._device.serial_number}_availability", {})
 
         # When the device is assumed offline keep polling data via HTTP in case EcoFlow broke the MQTT communication with the monthly server side updates
-        if self.state == "assume_offline" and val:
+        if self.state == "assume online" and val:
             if self.extra_state_attributes and self.extra_state_attributes.get(
                 "last_updated"
             ):
-                assume_offline = not dt_util.now() - self.extra_state_attributes[
+                assume_online = not dt_util.now() - self.extra_state_attributes[
                     "last_updated"
                 ] < timedelta(seconds=self._api.availability_check_interval_sec * 4)
-                if assume_offline:
-                    return super()._update_value("assume_offline")
+                if assume_online:
+                    return super()._update_value("assume online")
 
         return super()._update_value("online" if val else "offline")
 
@@ -636,7 +636,7 @@ class StatusSensorEntity(BaseSensorEntity):
 
         if self.state == "online":
             return "mdi:wifi"
-        if self.state == "assume_offline":
+        if self.state == "assume online":
             return "mdi:wifi-alert"
         return "mdi:wifi-off"
 
@@ -758,4 +758,11 @@ class WindSensorEntity(BaseSensorEntity):
     """Sensor for wind registration."""
 
     _attr_icon = "mdi:weather-windy-variant"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+
+class ShakeSensorEntity(BaseSensorEntity):
+    """Sensor for shake registration."""
+
+    _attr_icon = "mdi:vibrate"
     _attr_entity_category = EntityCategory.DIAGNOSTIC

@@ -2,6 +2,7 @@
 
 from collections.abc import Sequence
 
+from homeassistant.components.button import ButtonEntity
 from homeassistant.const import UnitOfTime
 
 from ..api import EcoFlowIoTOpenAPIInterface
@@ -37,6 +38,66 @@ class PowerStream(BaseDevice):
         """Initialize."""
         super().__init__(device_info, api_interface)
         self._model = "PowerStream"
+
+    def buttons(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[ButtonEntity]:
+        """Available buttons for DELTA Max."""
+
+        return []
+
+    def numbers(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[BaseNumberEntity]:
+        """Available numbers for PowerStream."""
+
+        return [
+            PowerNumberEntity(
+                api,
+                self,
+                "iot.permanentWatts",
+                min_value=0,
+                max_value=800,
+                command=lambda value: {
+                    "cmdCode": "WN511_SET_PERMANENT_WATTS_PACK",
+                    "params": {"permanentWatts": value * 10},
+                },
+            ),
+            BatteryNumberEntity(
+                api,
+                self,
+                "iot.lowerLimit",
+                min_value=1,
+                max_value=30,
+                command=lambda value: {
+                    "cmdCode": "WN511_SET_BAT_LOWER_PACK",
+                    "params": {"lowerLimit": value},
+                },
+            ),
+            BatteryNumberEntity(
+                api,
+                self,
+                "iot.upperLimit",
+                min_value=70,
+                max_value=100,
+                command=lambda value: {
+                    "cmdCode": "WN511_SET_BAT_UPPER_PACK",
+                    "params": {"upperLimit": value},
+                },
+            ),
+            BrightnessNumberEntity(
+                api,
+                self,
+                "iot.invBrightness",
+                min_value=0,
+                max_value=100,
+                command=lambda value: {
+                    "cmdCode": "WN511_SET_BRIGHTNESS_PACK",
+                    "params": {"brightness": round((value * 1023) / 100)},
+                },
+            ),
+        ]
+
+    def selects(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[SelectEntity]:
+        """Available selects for PowerStream."""
+
+        return []
 
     def sensors(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[BaseSensorEntity]:
         """Available sensors for PowerStream."""
@@ -305,60 +366,5 @@ class PowerStream(BaseDevice):
             ),
         ]
 
-    def numbers(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[BaseNumberEntity]:
-        """Available numbers for PowerStream."""
-
-        return [
-            PowerNumberEntity(
-                api,
-                self,
-                "iot.permanentWatts",
-                min_value=0,
-                max_value=800,
-                command=lambda value: {
-                    "cmdCode": "WN511_SET_PERMANENT_WATTS_PACK",
-                    "params": {"permanentWatts": value * 10},
-                },
-            ),
-            BatteryNumberEntity(
-                api,
-                self,
-                "iot.lowerLimit",
-                min_value=1,
-                max_value=30,
-                command=lambda value: {
-                    "cmdCode": "WN511_SET_BAT_LOWER_PACK",
-                    "params": {"lowerLimit": value},
-                },
-            ),
-            BatteryNumberEntity(
-                api,
-                self,
-                "iot.upperLimit",
-                min_value=70,
-                max_value=100,
-                command=lambda value: {
-                    "cmdCode": "WN511_SET_BAT_UPPER_PACK",
-                    "params": {"upperLimit": value},
-                },
-            ),
-            BrightnessNumberEntity(
-                api,
-                self,
-                "iot.invBrightness",
-                min_value=0,
-                max_value=100,
-                command=lambda value: {
-                    "cmdCode": "WN511_SET_BRIGHTNESS_PACK",
-                    "params": {"brightness": round((value * 1023) / 100)},
-                },
-            ),
-        ]
-
     # def datetimes(...)..
     # DateTimeEntity(dataHolder, self, "iot.updateTime"),
-
-    def selects(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[SelectEntity]:
-        """Available selects for PowerStream."""
-
-        return []
