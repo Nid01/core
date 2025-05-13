@@ -186,11 +186,11 @@ class EcoFlowBaseCommandEntity(EcoFlowBaseEntity):
                 raise ValueError("Set must contain exactly two integers")
             value, value2 = value
             if callable(self._command):
-                return self._command(value, value2)  # Pass two arguments
+                return self._command(value, value2)
         elif isinstance(value, int):
             if callable(self._command):
-                return self._command(value)  # Pass a single argument
+                return self._command(value)
         else:
-            return self._command()  # Pass a no argument
+            return self._command()
 
         raise TypeError("Invalid command callable or value type")

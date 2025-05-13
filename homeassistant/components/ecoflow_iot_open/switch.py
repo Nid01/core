@@ -69,19 +69,17 @@ class BaseSwitchEntity(SwitchEntity, EcoFlowBaseCommandEntity):
         if self._attr_is_on != bool(val):
             self._attr_is_on = bool(val)
 
-            # if hasattr(self, "icon"):
-            #     del self.icon  # invalidate cached icon because doesn't update properly
             return True
         return False
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the switch."""
-        # if self._command:
+
         await self.send_set_message(self.command_dict(1))
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the switch."""
-        # if self._command:
+
         await self.send_set_message(self.command_dict(0))
 
 

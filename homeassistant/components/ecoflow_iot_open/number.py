@@ -174,7 +174,6 @@ class MinimumLightIntesityNumberEntity(ValueUpdateNumberEntity):
 
         if state and "options" in state.attributes:
             try:
-                # Find the index of the current state in the options list
                 index = list(state.attributes["options"]).index(state.state)
                 await self.send_set_message(self.command_dict({value, index}))
             except ValueError:
