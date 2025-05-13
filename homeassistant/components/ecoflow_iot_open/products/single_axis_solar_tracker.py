@@ -238,9 +238,9 @@ class SingleAxisSolarTracker(BaseDevice):
             ModeAsWordSensorEntity(api, self, "iot.word"),
             StatusSensorEntity(api, self, "status").attr("last_updated"),
             TemperateSensorEntity(api, self, "iot.batteryTemperature"),
-            WaterSensorEntity(api, self, "iot.water"),
-            WindSensorEntity(api, self, "iot.wind"),
-            ShakeSensorEntity(api, self, "iot.shake"),
+            WaterSensorEntity(api, self, "iot.water", title="water detection"),
+            WindSensorEntity(api, self, "iot.wind", title="wind detection"),
+            ShakeSensorEntity(api, self, "iot.shake", title="shake detection"),
         ]
 
     def switches(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[SwitchEntity]:

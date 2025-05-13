@@ -747,22 +747,34 @@ class VoltageSensorEntity(BaseSensorEntity):
         return super()._update_value(value)
 
 
-class WaterSensorEntity(BaseSensorEntity):
-    """Sensor for water registration."""
+class DetectionSensorEntity(BaseSensorEntity):
+    """Sensor for detection."""
+
+    def _update_value(self, val: Any) -> bool:
+        val = (
+            ""
+            if bool(val)
+            else "no " + f"{self._mqtt_key.replace('iot.', '')} detected"
+        )
+        if self._attr_native_value != val:
+            self._attr_native_value = val
+            return True
+        return False
+
+
+class WaterSensorEntity(DetectionSensorEntity):
+    """Sensor for water detection."""
 
     _attr_icon = "mdi:weather-rainy"
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
 
-class WindSensorEntity(BaseSensorEntity):
-    """Sensor for wind registration."""
+class WindSensorEntity(DetectionSensorEntity):
+    """Sensor for wind detection."""
 
     _attr_icon = "mdi:weather-windy-variant"
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
 
-class ShakeSensorEntity(BaseSensorEntity):
-    """Sensor for shake registration."""
+class ShakeSensorEntity(DetectionSensorEntity):
+    """Sensor for shake detection."""
 
     _attr_icon = "mdi:vibrate"
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
