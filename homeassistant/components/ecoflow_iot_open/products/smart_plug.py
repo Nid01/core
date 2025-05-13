@@ -28,7 +28,7 @@ from . import BaseDevice
 
 
 class SmartPlug(BaseDevice):
-    """Smart Plug."""
+    """EcoFlow Smart Plug."""
 
     def __init__(self, device_info: dict, api_interface) -> None:
         """Initialize."""
@@ -36,7 +36,7 @@ class SmartPlug(BaseDevice):
         self._model = "Smart Plug"
 
     def buttons(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[ButtonEntity]:
-        """Available buttons for DELTA Max."""
+        """Available buttons for Smart Plug."""
 
         return []
 

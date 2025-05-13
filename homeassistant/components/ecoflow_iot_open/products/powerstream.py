@@ -32,7 +32,7 @@ from . import BaseDevice
 
 
 class PowerStream(BaseDevice):
-    """PowerStream."""
+    """EcoFlow PowerStream."""
 
     def __init__(self, device_info: dict, api_interface) -> None:
         """Initialize."""
@@ -40,7 +40,7 @@ class PowerStream(BaseDevice):
         self._model = "PowerStream"
 
     def buttons(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[ButtonEntity]:
-        """Available buttons for DELTA Max."""
+        """Available buttons for PowerStream."""
 
         return []
 

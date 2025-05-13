@@ -48,7 +48,7 @@ from . import (
 
 
 class SingleAxisSolarTracker(BaseDevice):
-    """Single Axis Solar Tracker."""
+    """EcoFlow Single Axis Solar Tracker."""
 
     def __init__(self, device_info: dict, api_interface) -> None:
         """Initialize."""

@@ -31,7 +31,7 @@ from . import BaseDevice
 
 
 class DELTAMax(BaseDevice):
-    """DELTA Max."""
+    """EcoFlow DELTA Max."""
 
     def __init__(self, device_info: dict, api_interface) -> None:
         """Initialize."""
