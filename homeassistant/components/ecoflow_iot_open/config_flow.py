@@ -171,8 +171,12 @@ class EcoflowOptionsFlow(OptionsFlow):
                 options=user_input,
             )
             if changed:
-                await self.hass.config_entries.async_reload(self.config_entry.entry_id)
-            return self.async_create_entry(title="", data=user_input)
+                self.hass.config_entries.async_schedule_reload(
+                    self.config_entry.entry_id
+                )
+                return self.async_abort(
+                    reason="Options submitted and config entry reloaded"
+                )
 
         return self.async_show_form(
             step_id="init",
