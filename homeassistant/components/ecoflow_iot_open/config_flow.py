@@ -151,15 +151,14 @@ class EcoFlowIoTOpenConfigFlow(ConfigFlow, domain=DOMAIN):
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
         """Options callback for EcoFlow IoT Open."""
-        return EcoflowOptionsFlow(config_entry)
+        return EcoflowOptionsFlow()
 
 
 class EcoflowOptionsFlow(OptionsFlow):
     """Handle EcoFlow IoT Open options."""
 
-    def __init__(self, config_entry: ConfigEntry) -> None:
+    def __init__(self) -> None:
         """Initialize EcoFlow IoT Open options flow."""
-        self.config_entry = config_entry
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
