@@ -24,7 +24,9 @@ from aiomqtt.message import Message
 from multidict import CIMultiDict
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import DOMAIN as HOMEASSISTANT_DOMAIN, HomeAssistant
+from homeassistant.core import DOMAIN as HOMEASSISTANT_DOMAIN, Event, HomeAssistant
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.device_registry import EventDeviceRegistryUpdatedData
 from homeassistant.helpers.issue_registry import IssueSeverity, async_create_issue
 from homeassistant.util.dt import utcnow
 from homeassistant.util.ssl import get_default_context
@@ -63,11 +65,20 @@ class EcoFlowIoTOpenAPIInterface:
         app_password: str,
         app_base_url: str,
         availability_check_interval_sec: int = DEFAULT_AVAILABILITY_CHECK_INTERVAL_SEC,
+        config_entry_id: str | None = None,
     ) -> None:
         """Initialize an EcoFlowIoTOpenAPIInterface instance."""
         self.availability_check_interval_sec = availability_check_interval_sec
         self.data_holder = EcoFlowIoTOpenDataHolder()
         self.hass = hass
+
+        self._app_password = app_password
+        self._app_username = app_username
+        self._app_base_url = app_base_url
+        self._app_certification: dict[str, Any]
+        self._app_mqtt_certification: dict[str, Any]
+
+        self._config_entry_id = config_entry_id
 
         self._open_access_key = open_access_key
         self._open_secret_key = open_secret_key
@@ -77,16 +88,6 @@ class EcoFlowIoTOpenAPIInterface:
         self._open_mqtt_listener: asyncio.Task | None = None
         self._open_max_reconnects = 3
         self._open_reconnects = 0
-
-        self._app_password = app_password
-        self._app_username = app_username
-        self._app_base_url = app_base_url
-        self._app_certification: dict[str, Any]
-        self._app_mqtt_certification: dict[str, Any]
-        self._app_mqtt_client: Client | None = None
-        self._app_mqtt_listener: asyncio.Task | None = None
-        self._app_max_reconnects = 3
-        self._app_reconnects = 0
 
         self._products: dict[ProductType, dict[str, Any]] = {}
 
@@ -101,11 +102,13 @@ class EcoFlowIoTOpenAPIInterface:
         device_info: dict[str, Any],
         filtered_products: dict[ProductType, dict[str, Any]],
         product_types: list[ProductType],
+        config_entry: ConfigEntry,
     ) -> None:
         """Process device information and adds it to filtered_products if it matches the specified types."""
         device_quota = await self.getDeviceQuota(device_info["sn"])
         device_info.update(device_quota)
         device_info["status"] = device_info["online"]
+
         sn_prefix = device_info["sn"][:4]
         product_type = self._get_product_type(sn_prefix)
         if product_type and product_type in product_types:
@@ -153,7 +156,7 @@ class EcoFlowIoTOpenAPIInterface:
         # return None
 
     async def get_devices_by_product(
-        self, product_types: list[ProductType]
+        self, product_types: list[ProductType], config_entry: ConfigEntry
     ) -> dict[ProductType, dict[str, Any]]:
         """Retrieve devices by product type."""
         headers = create_headers(self._open_access_key, self._open_secret_key, None)
@@ -167,7 +170,9 @@ class EcoFlowIoTOpenAPIInterface:
         filtered_products: dict[ProductType, dict[str, Any]] = {}
         if device_list.get("message") == "Success":
             tasks = [
-                self._process_device(device, filtered_products, product_types)
+                self._process_device(
+                    device, filtered_products, product_types, config_entry
+                )
                 for device in device_list.get("data", [])
             ]
             await asyncio.gather(*tasks)
@@ -220,13 +225,13 @@ class EcoFlowIoTOpenAPIInterface:
         self._app_mqtt_certification = response["data"]
         _LOGGER.info("Successfully retrieved credentials for app MQTT API")
 
-    async def connect(self, hass: HomeAssistant, config_entry: ConfigEntry):
+    async def connect(self):
         """Establish a connection to the MQTT broker."""
         if self._open_mqtt_listener:
             _LOGGER.warning("MQTT listener is already running")
             return
         self._open_reconnects = 0
-        self._open_mqtt_listener = asyncio.create_task(self.subscribe(config_entry))
+        self._open_mqtt_listener = asyncio.create_task(self.subscribe())
 
     async def disconnect(self):
         """Disconnect from the MQTT broker."""
@@ -240,11 +245,20 @@ class EcoFlowIoTOpenAPIInterface:
         else:
             _LOGGER.warning("MQTT listener is not running")
 
-    async def subscribe(self, config_entry: ConfigEntry):
-        """Subscribe to MQTT topics."""
+    async def subscribe(self):
+        """Subscribe to MQTT topics, skipping disabled devices."""
         if not self._products:
             _LOGGER.error("No products found. Did you call setup before subscribing?")
             return
+
+        device_registry = dr.async_get(self.hass)
+        enabled_devices = set()
+
+        for device in device_registry.devices.values():
+            for identifier in device.identifiers:
+                if identifier[0] == DOMAIN:
+                    if device.disabled_by is None:
+                        enabled_devices.add(identifier[1])
 
         while self._open_reconnects < self._open_max_reconnects:
             try:
@@ -267,6 +281,7 @@ class EcoFlowIoTOpenAPIInterface:
                         for devices in self._products.values()
                         for device in devices.values()
                         for topic in ("status", "quota")
+                        if device.serial_number in enabled_devices
                     ]
                     if len(topics) > 0:
                         await self._open_mqtt_client.subscribe(topics)
@@ -293,7 +308,7 @@ class EcoFlowIoTOpenAPIInterface:
                         issue_domain=DOMAIN,
                         severity=IssueSeverity.ERROR,
                         translation_key="mqtt_connection",
-                        data={"entry_id": config_entry.entry_id},
+                        data={"entry_id": self._config_entry_id},
                         translation_placeholders={
                             "exception": f"{type(exception).__name__}: {exception}"
                         },
@@ -492,6 +507,27 @@ class EcoFlowIoTOpenAPIInterface:
                     await response.text(),
                 )
                 raise GenericHTTPError(response.status)
+
+    async def handle_device_registry_updated(
+        self, event: Event[EventDeviceRegistryUpdatedData]
+    ) -> None:
+        """Handle device registry updates.
+
+        This method listens for device registry updates and checks if the
+        'disabled_by' field has changed. If it has, it triggers a reload of
+        the config entry associated with the device, because without it entities don't recognize the device as enabled/disabled.
+
+        Args:
+            event (Event[EventDeviceRegistryUpdatedData]): The event data
+                containing information about the device registry update.
+
+        """
+        if event.data["action"] == "update":
+            changes = event.data["changes"]
+            if "disabled_by" in changes and self._config_entry_id is not None:
+                # Somehow the config entry gets reloaded twice with a delay of 30 seconds when a device gets enabled
+                # Should investigate/report this, but for now it doesn't seem to have any negative effect
+                self.hass.config_entries.async_schedule_reload(self._config_entry_id)
 
 
 def hmac_sha256(data: str, key: str) -> str:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 import json
 from typing import Any
@@ -579,39 +580,54 @@ class StatusSensorEntity(BaseSensorEntity):
         """Initialize with list_position and additional dictionary key."""
 
         super().__init__(api, device, mqtt_key, title, enabled, auto_enable)
-        async_track_time_interval(
+        self._remove_interval: Callable[[], None] | None = None
+
+    async def async_added_to_hass(self) -> None:
+        """Handle entity which will be added to Home Assistant."""
+        await super().async_added_to_hass()
+        if self._remove_interval is not None:
+            self._remove_interval()
+        self._remove_interval = async_track_time_interval(
             self.hass,
             self._check_device_availability,
             timedelta(seconds=self._api.availability_check_interval_sec),
         )
 
-    async def _check_device_availability(self, now):
-        """Periodically check and update device availability."""
-        if self.state == "online":
-            if self.extra_state_attributes and self.extra_state_attributes.get(
-                "last_updated"
-            ):
-                device_online = now - self.extra_state_attributes[
-                    "last_updated"
-                ] < timedelta(seconds=self._api.availability_check_interval_sec * 4)
-                if not device_online:
-                    self._device.set_availability(device_online)
-                    self.hass.bus.fire(
-                        f"device_{self._device.serial_number}_availability", {}
-                    )
-                    super()._update_value("assume online")
+    async def async_will_remove_from_hass(self) -> None:
+        """Handle entity which will be removed from Home Assistant."""
+        if self._remove_interval is not None:
+            self._remove_interval()
+            self._remove_interval = None
+        await super().async_will_remove_from_hass()
 
-        # When the device is assumed offline keep polling data via HTTP in case EcoFlow broke the MQTT communication with the monthly server side updates
-        if self.state == "assume online":
-            if isinstance(self.device_entry, DeviceEntry) and isinstance(
-                self.device_entry.serial_number, str
-            ):
-                device_quota = await self._api.getDeviceQuota(
-                    self.device_entry.serial_number
-                )
-                self._api.data_holder.update_params(
-                    device_quota, self.device_entry.serial_number
-                )
+    async def _check_device_availability(self, now: datetime) -> None:
+        """Periodically check and update device availability."""
+        if self.device_entry is not None and not self.device_entry.disabled:
+            if self.state == "online":
+                if self.extra_state_attributes and self.extra_state_attributes.get(
+                    "last_updated"
+                ):
+                    device_online = now - self.extra_state_attributes[
+                        "last_updated"
+                    ] < timedelta(seconds=self._api.availability_check_interval_sec * 4)
+                    if not device_online:
+                        self._device.set_availability(device_online)
+                        self.hass.bus.fire(
+                            f"device_{self._device.serial_number}_availability", {}
+                        )
+                        super()._update_value("assume online")
+
+            # When the device stops transmitting data via MQTT for too long, keep polling data via HTTP in case the MQTT communication broke due to monthly server side updates at EcoFlows end
+            if self.state == "assume online":
+                if isinstance(self.device_entry, DeviceEntry) and isinstance(
+                    self.device_entry.serial_number, str
+                ):
+                    device_quota = await self._api.getDeviceQuota(
+                        self.device_entry.serial_number
+                    )
+                    self._api.data_holder.update_params(
+                        device_quota, self.device_entry.serial_number
+                    )
 
     def _update_value(self, val: Any) -> bool:
         self._device.set_availability(val)

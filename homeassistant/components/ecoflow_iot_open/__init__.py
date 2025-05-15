@@ -7,6 +7,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers.device_registry import EVENT_DEVICE_REGISTRY_UPDATED
 
 from .api import EcoFlowIoTOpenAPIInterface
 from .const import (
@@ -58,6 +59,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
             config_entry.data[CONF_APP_PASSWORD],
             config_entry.data[CONF_APP_SERVER],
             config_entry.options[OPTS_AVAILABILITY_CHECK_INTERVAL_SEC],
+            config_entry.entry_id,
         )
         await api.certification()
     except (InvalidCredentialsError, KeyError):
@@ -73,7 +75,8 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
                 ProductType.POWERSTREAM,
                 ProductType.SINGLE_AXIS_SOLAR_TRACKER,
                 ProductType.SMART_PLUG,
-            ]
+            ],
+            config_entry,
         )
     except (ClientError, GenericHTTPError, InvalidResponseFormat) as err:
         raise ConfigEntryNotReady from err
@@ -86,7 +89,14 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
 
     await api.initializeDevices()
 
-    await api.connect(hass, config_entry)
+    await api.connect()
+
+    config_entry.async_on_unload(
+        hass.bus.async_listen(
+            EVENT_DEVICE_REGISTRY_UPDATED,
+            api.handle_device_registry_updated,
+        )
+    )
 
     return True
 
