@@ -19,7 +19,7 @@ import time
 from typing import Any
 
 from aiohttp import ClientSession
-from aiomqtt import Client, MqttCodeError
+from aiomqtt import Client
 from aiomqtt.message import Message
 from multidict import CIMultiDict
 
@@ -259,29 +259,27 @@ class EcoFlowIoTOpenAPIInterface:
                     tls_context=get_default_context(),
                 ) as open_client:
                     self._open_mqtt_client = open_client
-                    topics_qos: list[tuple[str, int]] = [
+                    topics: list[tuple[str, int]] = [
                         (
-                            f"/open/{self._open_certification['certificateAccount']}/{device.serial_number}/status",
+                            f"/open/{self._open_certification['certificateAccount']}/{device.serial_number}/{topic}",
                             1,
                         )
                         for devices in self._products.values()
                         for device in devices.values()
+                        for topic in ("status", "quota")
                     ]
-                    topics_qos += [
-                        (
-                            f"/open/{self._open_certification['certificateAccount']}/{device.serial_number}/quota",
-                            1,
+                    if len(topics) > 0:
+                        await self._open_mqtt_client.subscribe(topics)
+                        async for message in self._open_mqtt_client.messages:
+                            if isinstance(message.payload, bytes):
+                                await self._handle_mqtt_message(message)
+                    else:
+                        _LOGGER.warning(
+                            "No enabled devices found for MQTT subscription"
                         )
-                        for devices in self._products.values()
-                        for device in devices.values()
-                    ]
-                    await self._open_mqtt_client.subscribe(topics_qos)
-                    async for message in self._open_mqtt_client.messages:
-                        if isinstance(message.payload, bytes):
-                            await self._handle_mqtt_message(message)
-
-            except MqttCodeError as exception:
-                self._open_reconnects = self._open_reconnects + 1
+                        break
+            except Exception as exception:
+                self._open_reconnects += 1
                 _LOGGER.exception(
                     "Exception during subscription. %s reconnects left",
                     self._open_max_reconnects - self._open_reconnects,
@@ -290,14 +288,14 @@ class EcoFlowIoTOpenAPIInterface:
                     async_create_issue(
                         self.hass,
                         DOMAIN,
-                        DOMAIN + "_mqtt_connection",
+                        f"{DOMAIN}_mqtt_connection",
                         is_fixable=True,
                         issue_domain=DOMAIN,
                         severity=IssueSeverity.ERROR,
                         translation_key="mqtt_connection",
                         data={"entry_id": config_entry.entry_id},
                         translation_placeholders={
-                            "exception": f"[ReasonCode: {exception.rc}] {exception.args}"
+                            "exception": f"{type(exception).__name__}: {exception}"
                         },
                     )
                 await asyncio.sleep(5)
