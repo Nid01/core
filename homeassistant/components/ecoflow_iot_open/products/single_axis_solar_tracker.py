@@ -77,7 +77,7 @@ class SingleAxisSolarTracker(BaseDevice):
             product_id=1,
             version=19,
             payload_ver=1,
-            **{"from": "ios"},
+            **{"from": "HomeAssistant"},
             device_sn=self.serial_number,
         )
         message = single_axis_solar_tracker_pb2.setMessage(header=header)  # type: ignore[attr-defined]
@@ -107,26 +107,27 @@ class SingleAxisSolarTracker(BaseDevice):
                 api,
                 self,
                 "iot.angleTarget",
-                min_value=10,
-                max_value=85,
                 command=lambda value: {
                     "cmdId": 24,
                     "value": value - 10,
                     "dataLen": 2,
                 },
+                min_value=10,
+                max_value=85,
             ),
             MinimumLightIntesityNumberEntity(
                 api,
                 self,
                 "iot.strLux",
-                min_value=10000,
-                max_value=30000,
                 command=lambda value, value2: {
                     "cmdId": 27,
                     "value": value,
                     "value2": value2,
                     "dataLen": 6,
                 },
+                min_value=10000,
+                max_value=30000,
+                step=5000,
                 title="minimum light tracking sensitivity",
             ),
         ]

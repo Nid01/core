@@ -14,7 +14,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 
 from .api import EcoFlowIoTOpenAPIInterface
-from .const import DOMAIN, ECOFLOW, SINGLE_AXIS_SOLAR_TRACKER
+from .const import DOMAIN, ECOFLOW, MODELS, ProductType
 from .products import BaseDevice
 
 _LOGGER = logging.getLogger(__name__)
@@ -170,12 +170,19 @@ class EcoFlowBaseCommandEntity(EcoFlowBaseEntity):
 
     async def send_set_message(self, command: dict):
         """Send set message for EcoFlow device."""
-        if self.serial_number.startswith(SINGLE_AXIS_SOLAR_TRACKER):
-            protobuf_message = await self._device.prepare_protobuf_message(command)
-            if protobuf_message is not None:
-                await self._api.publish_app(self.serial_number, protobuf_message)
+        model = getattr(self._attr_device_info, "model", None)
+        if model in (
+            MODELS[ProductType.DELTA_MAX],
+            MODELS[ProductType.SINGLE_AXIS_SOLAR_TRACKER],
+        ):
+            if model in (MODELS[ProductType.SINGLE_AXIS_SOLAR_TRACKER],):
+                protobuf_message = await self._device.prepare_protobuf_message(command)
+                if protobuf_message is not None:
+                    await self._api.publish_app(self.serial_number, protobuf_message)
+                else:
+                    _LOGGER.error("Failed to send message: protobuf_message is None")
             else:
-                _LOGGER.error("Failed to send message: protobuf_message is None")
+                await self._api.publish_app(self.serial_number, command)
         else:
             await self._api.publish_open(self.serial_number, command)
 

@@ -48,12 +48,12 @@ class SmartPlug(BaseDevice):
                 api,
                 self,
                 "iot.brightness",
-                min_value=0,
-                max_value=100,
                 command=lambda value: {
                     "cmdCode": "WN511_SOCKET_SET_BRIGHTNESS_PACK",
                     "params": {"brightness": round((value * 1023) / 100)},
                 },
+                min_value=0,
+                max_value=100,
             )
         ]
 

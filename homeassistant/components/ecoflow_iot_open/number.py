@@ -58,9 +58,10 @@ class BaseNumberEntity(NumberEntity, EcoFlowBaseCommandEntity):
         api: EcoFlowIoTOpenAPIInterface,
         device: BaseDevice,
         mqtt_key: str,
+        command: Callable[[int], dict[str, Any]] | Callable[[Any, Any], dict[str, Any]],
         min_value: int,
         max_value: int,
-        command: Callable[[int], dict[str, Any]] | Callable[[Any, Any], dict[str, Any]],
+        step: int = 1,
         title: str = "",
         enabled: bool = True,
         auto_enable: bool = False,
@@ -69,6 +70,7 @@ class BaseNumberEntity(NumberEntity, EcoFlowBaseCommandEntity):
         super().__init__(api, device, mqtt_key, command, title, enabled, auto_enable)
         self._attr_native_max_value = max_value
         self._attr_native_min_value = min_value
+        self._attr_native_step = step
         self.entity_id = f"{NUMBER_DOMAIN}.{device.device_name.replace(' ', '_').replace('-', '_').replace('.', '_')}_{mqtt_key}"
 
     def _update_value(self, val: Any) -> bool:

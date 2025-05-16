@@ -31,17 +31,10 @@ from homeassistant.helpers.issue_registry import IssueSeverity, async_create_iss
 from homeassistant.util.dt import utcnow
 from homeassistant.util.ssl import get_default_context
 
-from .const import (
-    DEFAULT_AVAILABILITY_CHECK_INTERVAL_SEC,
-    DELTA_MAX,
-    DOMAIN,
-    POWERSTREAM,
-    SINGLE_AXIS_SOLAR_TRACKER,
-    SMART_PLUG,
-)
+from .const import DEFAULT_AVAILABILITY_CHECK_INTERVAL_SEC, DOMAIN, ProductType
 from .data_holder import EcoFlowIoTOpenDataHolder
 from .errors import EcoFlowIoTOpenError, GenericHTTPError, InvalidResponseFormat
-from .products import BaseDevice, ProductType
+from .products import BaseDevice
 
 _LOGGER = logging.getLogger(__name__)
 _CLIENT_LOGGER = logging.getLogger(f"{__name__}.client")
@@ -109,8 +102,7 @@ class EcoFlowIoTOpenAPIInterface:
         device_info.update(device_quota)
         device_info["status"] = device_info["online"]
 
-        sn_prefix = device_info["sn"][:4]
-        product_type = self._get_product_type(sn_prefix)
+        product_type = BaseDevice.get_product_type_from_serial_number(device_info["sn"])
         if product_type and product_type in product_types:
             if product_type not in filtered_products:
                 filtered_products[product_type] = {}
@@ -118,19 +110,6 @@ class EcoFlowIoTOpenAPIInterface:
             filtered_products[product_type][product_instance.serial_number] = (
                 product_instance
             )
-
-    def _get_product_type(self, sn_prefix: str) -> ProductType:
-        """Get the product type based on the serial number prefix."""
-        if sn_prefix == DELTA_MAX:
-            return ProductType.DELTA_MAX
-        if sn_prefix == SINGLE_AXIS_SOLAR_TRACKER:
-            return ProductType.SINGLE_AXIS_SOLAR_TRACKER
-        if sn_prefix == POWERSTREAM:
-            return ProductType.POWERSTREAM
-        if sn_prefix == SMART_PLUG:
-            return ProductType.SMART_PLUG
-        # To-Do: Return diagnostic/base product type in case of unknown prefix.
-        return ProductType.UNKNOWN
 
     def _create_product_instance(
         self, product_type: ProductType, device: dict[str, Any]
@@ -315,29 +294,33 @@ class EcoFlowIoTOpenAPIInterface:
                     )
                 await asyncio.sleep(5)
 
+    async def _prepare_message(self, command: dict) -> str:
+        message_id = random.randint(100000, 999999)
+        payload: dict[str, str | int] = {
+            "from": "HomeAssistant",
+            "id": message_id,
+            "version": "1.0",
+        }
+        payload.update(command)
+        return json.dumps(payload)
+
     async def publish_open(
         self,
         serial_number: str,
         command: dict,
     ):
         """Publish command to open MQTT set topic."""
-        message_id = random.randint(100000, 999999)
-        payload: dict[str, str | int] = {
-            "id": message_id,
-            "version": "1.0",
-        }
-        payload.update(command)
 
         await self._open_mqtt_client.publish(
             f"/open/{self._open_certification['certificateAccount']}/{serial_number}/set",
-            json.dumps(payload),
+            await self._prepare_message(command),
             1,
         )
 
     async def publish_app(
         self,
         serial_number: str,
-        message_bytes: bytes,
+        command: bytes | dict,
     ):
         """Publish command to app MQTT set topic."""
 
@@ -353,7 +336,9 @@ class EcoFlowIoTOpenAPIInterface:
         ) as app_client:
             await app_client.publish(
                 f"/app/{self._app_certification['user']['userId']}/{serial_number}/thing/property/set",
-                message_bytes,
+                await self._prepare_message(command)
+                if isinstance(command, dict)
+                else command,
                 1,
             )
 
@@ -369,7 +354,7 @@ class EcoFlowIoTOpenAPIInterface:
         _LOGGER.debug(json.dumps(unpacked_json, indent=2, sort_keys=True))
 
         serial_number = message.topic.value.split("/")[3]
-        product_type = self._get_product_type(serial_number[:4])
+        product_type = BaseDevice.get_product_type_from_serial_number(serial_number)
 
         if product_type != ProductType.UNKNOWN:
             if "param" in unpacked_json:
@@ -415,9 +400,10 @@ class EcoFlowIoTOpenAPIInterface:
             headers=headers,
             params=params,
         )
-        if response.get("message") == "Success" and serial_number[:4] in (
-            POWERSTREAM,
-            SMART_PLUG,
+        product_type = BaseDevice.get_product_type_from_serial_number(serial_number)
+        if response.get("message") == "Success" and product_type in (
+            ProductType.POWERSTREAM,
+            ProductType.SMART_PLUG,
         ):
             response["data"] = {
                 f"iot.{key.split('.', 2)[-1]}": value

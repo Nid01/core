@@ -52,45 +52,45 @@ class PowerStream(BaseDevice):
                 api,
                 self,
                 "iot.permanentWatts",
-                min_value=0,
-                max_value=800,
                 command=lambda value: {
                     "cmdCode": "WN511_SET_PERMANENT_WATTS_PACK",
                     "params": {"permanentWatts": value * 10},
                 },
+                min_value=0,
+                max_value=800,
             ),
             BatteryNumberEntity(
                 api,
                 self,
                 "iot.lowerLimit",
-                min_value=1,
-                max_value=30,
                 command=lambda value: {
                     "cmdCode": "WN511_SET_BAT_LOWER_PACK",
                     "params": {"lowerLimit": value},
                 },
+                min_value=0,
+                max_value=30,
             ),
             BatteryNumberEntity(
                 api,
                 self,
                 "iot.upperLimit",
-                min_value=70,
-                max_value=100,
                 command=lambda value: {
                     "cmdCode": "WN511_SET_BAT_UPPER_PACK",
                     "params": {"upperLimit": value},
                 },
+                min_value=70,
+                max_value=100,
             ),
             BrightnessNumberEntity(
                 api,
                 self,
                 "iot.invBrightness",
-                min_value=0,
-                max_value=100,
                 command=lambda value: {
                     "cmdCode": "WN511_SET_BRIGHTNESS_PACK",
                     "params": {"brightness": round((value * 1023) / 100)},
                 },
+                min_value=0,
+                max_value=100,
             ),
         ]
 

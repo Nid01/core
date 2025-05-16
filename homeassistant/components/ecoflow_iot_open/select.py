@@ -56,7 +56,7 @@ class BaseSelectEntity(SelectEntity, EcoFlowBaseCommandEntity):
         command: Callable[[], dict[str, Any]]
         | Callable[[Any], dict[str, Any]]
         | Callable[[Any, Any], dict[str, Any]],
-        options: list[str],
+        options: list[str] | dict[str, int],
         title: str = "",
         enabled: bool = True,
         auto_enable: bool = False,
@@ -70,25 +70,42 @@ class BaseSelectEntity(SelectEntity, EcoFlowBaseCommandEntity):
         else:
             unique_id = f"{device.serial_number}_{mqtt_key}"
         self._attr_unique_id = unique_id
-        self._attr_options = options
+        self._attr_options = (
+            list(options.keys()) if isinstance(options, dict) else options
+        )
         self._attr_current_option = None
+        self._options_dict = options
 
     def _update_value(self, val: Any) -> bool:
+        if self._attr_name in ("pd.standByMode", "pd.lcdOffSec", "inv.cfgStandbyMin"):
+            ival = int(val)
+            if isinstance(self._options_dict, dict):
+                lval = [k for k, v in self._options_dict.items() if v == ival]
+                if len(lval) == 1:
+                    self._attr_current_option = lval[0]
+                    return True
+                return False
+            return False
+
         val = val - 1
-        # if isinstance(val, int):
+
         if 0 <= val < len(self._attr_options):
-            if self._attr_current_option != val:
+            if self._attr_current_option != self._attr_options[val]:
                 self._attr_current_option = self._attr_options[val]
             return True
         return False
 
     async def async_select_option(self, option: str) -> None:
         """Update the current selected option."""
-        if option in self._attr_options:
+
+        if self._attr_name in ("pd.standByMode", "pd.lcdOffSec", "inv.cfgStandbyMin"):
+            if isinstance(self._options_dict, dict):
+                val = self._options_dict[option]
+                await self.send_set_message(self.command_dict(int(val)))
+        elif option in self._attr_options:
             index = self._attr_options.index(option)
             self._attr_current_option = option
-
-        await self.send_set_message(self.command_dict(index))
+            await self.send_set_message(self.command_dict(index))
 
 
 class LightTrackingSensitivitySelectEntity(BaseSelectEntity):

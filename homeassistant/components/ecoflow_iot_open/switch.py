@@ -98,7 +98,23 @@ class BeeperSwitchEntity(BaseSwitchEntity):
     """Beeper switch."""
 
     def _update_value(self, val: Any) -> bool:
-        return super()._update_value(val & (1 << 0))
+        return super()._update_value(
+            (not val) if self._attr_name == "pd.beepState" else val & (1 << 0)
+        )
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Turn on the switch."""
+
+        await self.send_set_message(
+            self.command_dict(0 if self._attr_name == "pd.beepState" else 1)
+        )
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Turn off the switch."""
+
+        await self.send_set_message(
+            self.command_dict(1 if self._attr_name == "pd.beepState" else 0)
+        )
 
     @property
     def icon(self) -> str:

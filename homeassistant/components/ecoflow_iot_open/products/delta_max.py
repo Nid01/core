@@ -9,7 +9,8 @@ from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import UnitOfElectricCurrent, UnitOfTime
 
 from ..api import EcoFlowIoTOpenAPIInterface
-from ..select import SelectEntity
+from ..number import BaseNumberEntity, BatteryNumberEntity
+from ..select import BaseSelectEntity, SelectEntity
 from ..sensor import (
     BatterySensorEntity,
     BinaryStateSensorEntity,
@@ -27,6 +28,7 @@ from ..sensor import (
     TemperateSensorEntity,
     VoltageSensorEntity,
 )
+from ..switch import BaseSwitchEntity, BeeperSwitchEntity
 from . import BaseDevice
 
 
@@ -45,13 +47,120 @@ class DELTAMax(BaseDevice):
 
     def numbers(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[NumberEntity]:
         """Available numbers for DELTA Max."""
-
-        return []
+        return [
+            BatteryNumberEntity(
+                api,
+                self,
+                "ems.minDsgSoc",
+                command=lambda value: {
+                    "operateType": "TCP",
+                    "params": {"id": 51, "minDsgSoc": value},
+                },
+                min_value=0,
+                max_value=30,
+            ),
+            BatteryNumberEntity(
+                api,
+                self,
+                "ems.maxChargeSoc",
+                command=lambda value: {
+                    "operateType": "TCP",
+                    "params": {"id": 49, "maxChgSoc": value},
+                },
+                min_value=50,
+                max_value=100,
+            ),
+            BaseNumberEntity(
+                api,
+                self,
+                "inv.cfgSlowChgWatts",
+                command=lambda value: {
+                    "operateType": "TCP",
+                    "params": {"id": 69, "slowChgPower": value},
+                },
+                min_value=100,
+                max_value=2000,
+                step=100,
+            ),
+            # Smart Generator auto start/stop
+            # ems.maxCloseOilEbSoc
+            # {"from":"iOS","operateType":"TCP","id":"923408316","lang":"en-us","params":{"id":53,"closeOilSoc":100},"version":"1.0"}
+            # ems.minOpenOilEbSoc
+            # {"from":"iOS","operateType":"TCP","id":"923406217","lang":"en-us","params":{"id":52,"openOilSoc":0},"version":"1.0"}
+        ]
 
     def selects(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[SelectEntity]:
         """Available selects for DELTA Max."""
 
-        return []
+        return [
+            # BaseSelectEntity(
+            #     api,
+            #     self,
+            #     "",  # No trackable mqtt key found
+            #     command=lambda value: {
+            #         "operateType": "TCP",
+            #         "params": {"id": 71, "currMa": value},
+            #     },
+            #     options={
+            #         "4A": 4000,
+            #         "6A": 6000,
+            #         "8A": 8000,
+            #     },
+            # ),
+            BaseSelectEntity(
+                api,
+                self,
+                "pd.standByMode",
+                command=lambda value: {
+                    "operateType": "TCP",
+                    "params": {"id": 33, "standByMode": value},
+                },
+                options={
+                    "Never": 0,
+                    "30 min": 30,
+                    "1 hr": 60,
+                    "2 hr": 120,
+                    "4 hr": 240,
+                    "6 hr": 360,
+                    "12 hr": 720,
+                    "24 hr": 1440,
+                },
+            ),
+            BaseSelectEntity(
+                api,
+                self,
+                "pd.lcdOffSec",
+                command=lambda value: {
+                    "operateType": "TCP",
+                    "params": {"id": 39, "lcdTime": value},
+                },
+                options={
+                    "10 sec": 10,
+                    "30 sec": 30,
+                    "1 min": 60,
+                    "5 min": 300,
+                    "30 min": 1800,
+                    "Never": 0,
+                },
+            ),
+            BaseSelectEntity(
+                api,
+                self,
+                "inv.cfgStandbyMin",
+                command=lambda value: {
+                    "operateType": "TCP",
+                    "params": {"id": 153, "standByMins": value},
+                },
+                options={
+                    "2 hr": 120,
+                    "4 hr": 240,
+                    "6 hr": 360,
+                    "12 hr": 720,
+                    "24 hr": 1440,
+                    "Never": 0,
+                },
+            ),
+        ]
 
     def sensors(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[SensorEntity]:
         """Available sensors for DELTA Max."""
@@ -100,7 +209,6 @@ class DELTAMax(BaseDevice):
 
         binary_state_keys = [
             "inv.fanState",
-            "pd.beepState",
         ]
 
         binary_state_sensors = [
@@ -196,17 +304,14 @@ class DELTAMax(BaseDevice):
             "bmsSlave1.remainTime",
             "ems.chgRemainTime",
             "ems.dsgRemainTime",
-            "inv.cfgStandbyMin",
             "pd.carUsedTime",
             "pd.dcInUsedTime",
             "pd.invUsedTime",
-            "pd.lcdOffSec",
             "pd.mpptUsedTime",
             "pd.remainTime",
             "pd.typccUsedTime",
             "pd.usbqcUsedTime",
             "pd.usbUsedTime",
-            "pd.standByMode",
         ]
 
         duration_units = {
@@ -370,7 +475,7 @@ class DELTAMax(BaseDevice):
             "bmsSlave1.cellTemp",
             "bmsMaster.cellVol",
             "bmsSlave1.cellVol",
-            "pd.lcdBrightness",
+            "status",
             # icons
             "pd.iconAcFreqMode",
             "pd.iconAcFreqState",
@@ -426,7 +531,21 @@ class DELTAMax(BaseDevice):
             "pd.iconWindGenState",
             "pd.iconWirelessChgMode",
             "pd.iconWirelessChgState",
-            "status",
+            # numbers
+            "ems.minDsgSoc",
+            "ems.maxChargeSoc",
+            # selects
+            "inv.cfgStandbyMin",
+            "pd.lcdOffSec",
+            "pd.standByMode",
+            # switches
+            "inv.acPassByAutoEn",
+            "inv.cfgAcEnabled",
+            "inv.cfgAcXboost",
+            "mppt.carState",
+            "pd.beepState",
+            "pd.dcOutState",
+            "pd.lcdBrightness",
         ]
 
         found_keys = set(
@@ -457,7 +576,12 @@ class DELTAMax(BaseDevice):
         diagnostic_keys = device_info_keys - found_string_keys
 
         diagnostic_sensors = [
-            DiagnosticSensorEntity(api, self, key, enabled=False)
+            DiagnosticSensorEntity(
+                api,
+                self,
+                key,
+                enabled=False,
+            )
             for key in diagnostic_keys
         ]
 
@@ -483,15 +607,63 @@ class DELTAMax(BaseDevice):
         """Available switches for DELTA Max."""
 
         return [
-            # parameters are not identical between Delta2Max and not documented DeltaMax
-            # BaseSwitchEntity(
-            #     api,
-            #     self,
-            #     "pd.beepMode",
-            #     command=lambda value: {
-            #         "moduleType": 1,
-            #         "operateType": "quietCfg",
-            #         "params": {"enabled": value},
-            #     },
-            # )
+            BeeperSwitchEntity(
+                api,
+                self,
+                "pd.beepState",
+                lambda value: {
+                    "moduleType": 5,
+                    "operateType": "TCP",
+                    "params": {"id": 38, "enabled": value},
+                },
+            ),
+            BaseSwitchEntity(
+                api,
+                self,
+                "pd.dcOutState",
+                lambda value: {
+                    "moduleType": 0,
+                    "operateType": "TCP",
+                    "params": {"enabled": value, "id": 34},
+                },
+            ),
+            BaseSwitchEntity(
+                api,
+                self,
+                "inv.cfgAcEnabled",
+                lambda value: {
+                    "moduleType": 0,
+                    "operateType": "TCP",
+                    "params": {"enabled": value, "id": 66},
+                },
+            ),
+            BaseSwitchEntity(
+                api,
+                self,
+                "inv.cfgAcXboost",
+                lambda value: {
+                    "moduleType": 5,
+                    "operateType": "TCP",
+                    "params": {"id": 66, "xboost": value},
+                },
+            ),
+            BaseSwitchEntity(
+                api,
+                self,
+                "mppt.carState",
+                lambda value: {
+                    "moduleType": 0,
+                    "operateType": "TCP",
+                    "params": {"enabled": value, "id": 81},
+                },
+            ),
+            BaseSwitchEntity(
+                api,
+                self,
+                "inv.acPassByAutoEn",
+                lambda value: {
+                    "operateType": "TCP",
+                    "params": {"enabled": value, "id": 84},
+                },
+            ),
         ]

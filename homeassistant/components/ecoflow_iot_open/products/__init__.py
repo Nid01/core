@@ -11,13 +11,7 @@ from homeassistant.components.select import SelectEntity
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.components.switch import SwitchEntity
 
-from ..const import (
-    DELTA_MAX,
-    POWERSTREAM,
-    SINGLE_AXIS_SOLAR_TRACKER,
-    SMART_PLUG,
-    ProductType,
-)
+from ..const import SERIAL_NUMBER_PREFIXES, ProductType
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -69,16 +63,19 @@ class BaseDevice(ABC):
         """Return a empty list of SwitchEntity."""
 
     @staticmethod
-    def _get_productType_for_sn_prefix(value: str) -> ProductType:
-        """Return a proper type from a string input."""
-        _serial_number = value[:4]
-        if _serial_number == DELTA_MAX:
+    def get_product_type_from_serial_number(value: str) -> ProductType:
+        """Return the ProductType based on the serial number."""
+        serial_number_prefix = value[:4]
+        if serial_number_prefix == SERIAL_NUMBER_PREFIXES[ProductType.DELTA_MAX]:
             return ProductType.DELTA_MAX
-        if _serial_number == SINGLE_AXIS_SOLAR_TRACKER:
+        if (
+            serial_number_prefix
+            == SERIAL_NUMBER_PREFIXES[ProductType.SINGLE_AXIS_SOLAR_TRACKER]
+        ):
             return ProductType.SINGLE_AXIS_SOLAR_TRACKER
-        if _serial_number == POWERSTREAM:
+        if serial_number_prefix == SERIAL_NUMBER_PREFIXES[ProductType.POWERSTREAM]:
             return ProductType.POWERSTREAM
-        if _serial_number == SMART_PLUG:
+        if serial_number_prefix == SERIAL_NUMBER_PREFIXES[ProductType.SMART_PLUG]:
             return ProductType.SMART_PLUG
         _LOGGER.error("Unknown device type state: %s", value)
         return ProductType.UNKNOWN
@@ -91,7 +88,7 @@ class BaseDevice(ABC):
     @property
     def type(self) -> ProductType:
         """Return the ProductType of the device."""
-        return self._get_productType_for_sn_prefix(self.serial_number)
+        return self.get_product_type_from_serial_number(self.serial_number)
 
     @property
     def device_name(self) -> str:
