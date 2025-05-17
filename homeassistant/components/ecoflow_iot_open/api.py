@@ -411,7 +411,7 @@ class EcoFlowIoTOpenAPIInterface:
         _LOGGER.debug(json.dumps(unpacked_json, indent=2, sort_keys=True))
 
         serial_number = message.topic.value.split("/")[
-            4 if "/property/" in message.topic.value else 3
+            4 if message.topic.value.startswith("/app/") else 3
         ]
         product_type = BaseDevice.get_product_type_from_serial_number(serial_number)
 
