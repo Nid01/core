@@ -219,27 +219,30 @@ class EcoFlowIoTOpenAPIInterface:
         self._app_mqtt_listener = asyncio.create_task(self.subscribe_app())
 
     async def disconnect(self):
-        """Disconnect from the MQTT broker."""
+        """Asynchronously disconnects MQTT listeners by cancelling their tasks.
 
-        if self._open_mqtt_listener:
-            self._open_mqtt_listener.cancel()
-            try:
-                await self._open_mqtt_listener
-            except asyncio.CancelledError:
-                _LOGGER.info("MQTT listener task has been cancelled")
-            self._open_mqtt_listener = None
-        else:
-            _LOGGER.warning("MQTT listener is not running")
+        This method checks if the `_open_mqtt_listener` and `_app_mqtt_listener` tasks are running.
+        If they are, it cancels and awaits them, handling `asyncio.CancelledError` exceptions and logging
+        the cancellation. If a listener is not running, a warning is logged.
 
-        if self._app_mqtt_listener:
-            self._app_mqtt_listener.cancel()
-            try:
-                await self._app_mqtt_listener
-            except asyncio.CancelledError:
-                _LOGGER.info("MQTT listener task has been cancelled")
-            self._app_mqtt_listener = None
-        else:
-            _LOGGER.warning("MQTT listener is not running")
+        Raises:
+            asyncio.CancelledError: If the cancellation of a listener task raises this exception.
+
+        """
+
+        for api_variant in ("open", "app"):
+            listener = getattr(self, f"_{api_variant}_mqtt_listener")
+            if listener:
+                listener.cancel()
+                try:
+                    await listener
+                except asyncio.CancelledError:
+                    _LOGGER.info(
+                        "%s MQTT listener task has been cancelled", api_variant
+                    )
+                setattr(self, f"_{api_variant}_mqtt_listener", None)
+            else:
+                _LOGGER.warning("%s MQTT listener is not running", api_variant)
 
     async def _subscribe_mqtt(
         self,
