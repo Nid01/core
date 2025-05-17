@@ -170,7 +170,11 @@ class EcoFlowBaseCommandEntity(EcoFlowBaseEntity):
 
     async def send_set_message(self, command: dict):
         """Send set message for EcoFlow device."""
-        model = getattr(self._attr_device_info, "model", None)
+        model = (
+            self._attr_device_info.get("model")
+            if isinstance(self._attr_device_info, dict)
+            else getattr(self._attr_device_info, "model", None)
+        )
         if model in (
             MODELS[ProductType.DELTA_MAX],
             MODELS[ProductType.SINGLE_AXIS_SOLAR_TRACKER],
