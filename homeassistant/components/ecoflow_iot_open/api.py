@@ -8,6 +8,7 @@ and handling MQTT messages.
 
 import asyncio
 import base64
+from collections.abc import Callable
 from datetime import UTC, datetime
 import hashlib
 import hmac
@@ -31,7 +32,7 @@ from homeassistant.helpers.issue_registry import IssueSeverity, async_create_iss
 from homeassistant.util.dt import utcnow
 from homeassistant.util.ssl import get_default_context
 
-from .const import DEFAULT_AVAILABILITY_CHECK_INTERVAL_SEC, DOMAIN, ProductType
+from .const import DEFAULT_AVAILABILITY_CHECK_INTERVAL_SEC, DOMAIN, MODELS, ProductType
 from .data_holder import EcoFlowIoTOpenDataHolder
 from .errors import EcoFlowIoTOpenError, GenericHTTPError, InvalidResponseFormat
 from .products import BaseDevice
@@ -70,6 +71,10 @@ class EcoFlowIoTOpenAPIInterface:
         self._app_base_url = app_base_url
         self._app_certification: dict[str, Any]
         self._app_mqtt_certification: dict[str, Any]
+        self._app_mqtt_client: Client
+        self._app_mqtt_listener: asyncio.Task | None = None
+        self._app_max_reconnects = 3
+        self._app_reconnects = 0
 
         self._config_entry_id = config_entry_id
 
@@ -210,10 +215,12 @@ class EcoFlowIoTOpenAPIInterface:
             _LOGGER.warning("MQTT listener is already running")
             return
         self._open_reconnects = 0
-        self._open_mqtt_listener = asyncio.create_task(self.subscribe())
+        self._open_mqtt_listener = asyncio.create_task(self.subscribe_open())
+        self._app_mqtt_listener = asyncio.create_task(self.subscribe_app())
 
     async def disconnect(self):
         """Disconnect from the MQTT broker."""
+
         if self._open_mqtt_listener:
             self._open_mqtt_listener.cancel()
             try:
@@ -224,47 +231,69 @@ class EcoFlowIoTOpenAPIInterface:
         else:
             _LOGGER.warning("MQTT listener is not running")
 
-    async def subscribe(self):
-        """Subscribe to MQTT topics, skipping disabled devices."""
-        if not self._products:
-            _LOGGER.error("No products found. Did you call setup before subscribing?")
-            return
+        if self._app_mqtt_listener:
+            self._app_mqtt_listener.cancel()
+            try:
+                await self._app_mqtt_listener
+            except asyncio.CancelledError:
+                _LOGGER.info("MQTT listener task has been cancelled")
+            self._app_mqtt_listener = None
+        else:
+            _LOGGER.warning("MQTT listener is not running")
 
+    async def _subscribe_mqtt(
+        self,
+        client_cert: dict[str, Any],
+        topic_fn: Callable[[Any], str],
+        enabled_filter: Callable[[Any], bool],
+        api_variant: str,
+    ) -> None:
+        """Subscribe to MQTT topics for the specified client.
+
+        This method handles the connection to the MQTT broker and subscribes
+        to the specified topics. It will attempt to reconnect if the connection
+        is lost, up to a maximum number of reconnect attempts.
+
+        Args:
+            client_cert (dict[str, Any]): Client certification information.
+            topic_fn (Callable): Function to generate the topic for each device.
+            enabled_filter (Callable): Function to filter enabled devices.
+            api_variant (str): API variant to use ("open" or "app").
+
+        """
         device_registry = dr.async_get(self.hass)
-        enabled_devices = set()
+        enabled_devices = {
+            identifier[1]
+            for device in device_registry.devices.values()
+            for identifier in device.identifiers
+            if identifier[0] == DOMAIN and enabled_filter(device)
+        }
 
-        for device in device_registry.devices.values():
-            for identifier in device.identifiers:
-                if identifier[0] == DOMAIN:
-                    if device.disabled_by is None:
-                        enabled_devices.add(identifier[1])
+        reconnects = getattr(self, f"_{api_variant}_reconnects")
+        max_reconnects = getattr(self, f"_{api_variant}_max_reconnects")
 
-        while self._open_reconnects < self._open_max_reconnects:
+        while reconnects < max_reconnects:
             try:
                 async with Client(
-                    hostname=self._open_certification["url"],
-                    port=int(self._open_certification["port"]),
-                    username=self._open_certification["certificateAccount"],
-                    password=self._open_certification["certificatePassword"],
+                    hostname=client_cert["url"],
+                    port=int(client_cert["port"]),
+                    username=client_cert["certificateAccount"],
+                    password=client_cert["certificatePassword"],
                     logger=_CLIENT_LOGGER,
-                    identifier=self._get_client_id("open"),
+                    identifier=self._get_client_id(api_variant),
                     tls_insecure=False,
                     tls_context=get_default_context(),
-                ) as open_client:
-                    self._open_mqtt_client = open_client
+                ) as mqtt_client:
+                    setattr(self, api_variant, mqtt_client)
                     topics: list[tuple[str, int]] = [
-                        (
-                            f"/open/{self._open_certification['certificateAccount']}/{device.serial_number}/{topic}",
-                            1,
-                        )
+                        (topic_fn(device.serial_number), 1)
                         for devices in self._products.values()
                         for device in devices.values()
-                        for topic in ("status", "quota")
                         if device.serial_number in enabled_devices
                     ]
-                    if len(topics) > 0:
-                        await self._open_mqtt_client.subscribe(topics)
-                        async for message in self._open_mqtt_client.messages:
+                    if topics:
+                        await mqtt_client.subscribe(topics)
+                        async for message in mqtt_client.messages:
                             if isinstance(message.payload, bytes):
                                 await self._handle_mqtt_message(message)
                     else:
@@ -273,26 +302,55 @@ class EcoFlowIoTOpenAPIInterface:
                         )
                         break
             except Exception as exception:
-                self._open_reconnects += 1
+                reconnects += 1
+                setattr(self, f"_{api_variant}_reconnects", reconnects)
                 _LOGGER.exception(
                     "Exception during subscription. %s reconnects left",
-                    self._open_max_reconnects - self._open_reconnects,
+                    max_reconnects - reconnects,
                 )
-                if self._open_reconnects == self._open_max_reconnects:
+                if reconnects == max_reconnects:
                     async_create_issue(
                         self.hass,
                         DOMAIN,
-                        f"{DOMAIN}_mqtt_connection",
+                        f"{DOMAIN}_{api_variant}_mqtt_connection",
                         is_fixable=True,
                         issue_domain=DOMAIN,
                         severity=IssueSeverity.ERROR,
-                        translation_key="mqtt_connection",
+                        translation_key="_{api_variant}mqtt_connection",
                         data={"entry_id": self._config_entry_id},
                         translation_placeholders={
                             "exception": f"{type(exception).__name__}: {exception}"
                         },
                     )
                 await asyncio.sleep(5)
+
+    async def subscribe_open(self):
+        """Subscribe to open MQTT topics, skipping disabled devices."""
+        if not self._products:
+            _LOGGER.error("No products found. Did you call setup before subscribing?")
+            return
+
+        await self._subscribe_mqtt(
+            client_cert=self._open_certification,
+            topic_fn=lambda serial_number: f"/open/{self._open_certification['certificateAccount']}/{serial_number}/status",
+            enabled_filter=lambda device: device.disabled_by is None
+            and device.model != MODELS[ProductType.DELTA_MAX],
+            api_variant="open",
+        )
+
+    async def subscribe_app(self):
+        """Subscribe to app MQTT topics, skipping disabled devices."""
+        if not self._products:
+            _LOGGER.error("No products found. Did you call setup before subscribing?")
+            return
+
+        await self._subscribe_mqtt(
+            client_cert=self._app_mqtt_certification,
+            topic_fn=lambda serial_number: f"/app/device/property/{serial_number}",
+            enabled_filter=lambda device: device.disabled_by is None
+            and device.model == MODELS[ProductType.DELTA_MAX],
+            api_variant="app",
+        )
 
     async def _prepare_message(self, command: dict) -> str:
         message_id = random.randint(100000, 999999)
@@ -304,43 +362,37 @@ class EcoFlowIoTOpenAPIInterface:
         payload.update(command)
         return json.dumps(payload)
 
+    async def _publish_mqtt(
+        self,
+        client: Client,
+        topic: str,
+        command: bytes | dict,
+    ) -> None:
+        """Publish a command to an MQTT topic."""
+        payload = (
+            await self._prepare_message(command)
+            if isinstance(command, dict)
+            else command
+        )
+        await client.publish(topic, payload, 1)
+
     async def publish_open(
         self,
         serial_number: str,
         command: dict,
-    ):
+    ) -> None:
         """Publish command to open MQTT set topic."""
-
-        await self._open_mqtt_client.publish(
-            f"/open/{self._open_certification['certificateAccount']}/{serial_number}/set",
-            await self._prepare_message(command),
-            1,
-        )
+        topic = f"/open/{self._open_certification['certificateAccount']}/{serial_number}/set"
+        await self._publish_mqtt(self._open_mqtt_client, topic, command)
 
     async def publish_app(
         self,
         serial_number: str,
         command: bytes | dict,
-    ):
+    ) -> None:
         """Publish command to app MQTT set topic."""
-
-        async with Client(
-            hostname=self._app_mqtt_certification["url"],
-            port=int(self._app_mqtt_certification["port"]),
-            username=self._app_mqtt_certification["certificateAccount"],
-            password=self._app_mqtt_certification["certificatePassword"],
-            logger=_CLIENT_LOGGER,
-            identifier=self._get_client_id("app"),
-            tls_insecure=False,
-            tls_context=get_default_context(),
-        ) as app_client:
-            await app_client.publish(
-                f"/app/{self._app_certification['user']['userId']}/{serial_number}/thing/property/set",
-                await self._prepare_message(command)
-                if isinstance(command, dict)
-                else command,
-                1,
-            )
+        topic = f"/app/{self._app_certification['user']['userId']}/{serial_number}/thing/property/set"
+        await self._publish_mqtt(self._app_mqtt_client, topic, command)
 
     async def _handle_mqtt_message(self, message: Message):
         """Handle incoming MQTT messages."""
@@ -353,7 +405,9 @@ class EcoFlowIoTOpenAPIInterface:
         _LOGGER.debug("MQTT message from topic: %s", message.topic)
         _LOGGER.debug(json.dumps(unpacked_json, indent=2, sort_keys=True))
 
-        serial_number = message.topic.value.split("/")[3]
+        serial_number = message.topic.value.split("/")[
+            4 if "/property/" in message.topic.value else 3
+        ]
         product_type = BaseDevice.get_product_type_from_serial_number(serial_number)
 
         if product_type != ProductType.UNKNOWN:
