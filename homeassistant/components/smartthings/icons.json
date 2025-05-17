@@ -31,6 +31,9 @@
     "number": {
       "washer_rinse_cycles": {
         "default": "mdi:waves-arrow-up"
+      },
+      "freezer_temperature": {
+        "default": "mdi:snowflake-thermometer"
       }
     },
     "select": {
@@ -39,6 +42,13 @@
           "run": "mdi:play",
           "pause": "mdi:pause",
           "stop": "mdi:stop"
+        }
+      },
+      "lamp": {
+        "default": "mdi:lightbulb",
+        "state": {
+          "on": "mdi:lightbulb-on",
+          "off": "mdi:lightbulb-off"
         }
       },
       "detergent_amount": {
