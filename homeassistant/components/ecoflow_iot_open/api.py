@@ -284,7 +284,7 @@ class EcoFlowIoTOpenAPIInterface:
                     tls_insecure=False,
                     tls_context=get_default_context(),
                 ) as mqtt_client:
-                    setattr(self, api_variant, mqtt_client)
+                    setattr(self, f"_{api_variant}_mqtt_client", mqtt_client)
                     topics: list[tuple[str, int]] = [
                         (topic_fn(device.serial_number), 1)
                         for devices in self._products.values()
