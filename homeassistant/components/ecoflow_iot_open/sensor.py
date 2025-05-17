@@ -36,7 +36,7 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 
 from .api import EcoFlowIoTOpenAPIInterface
-from .const import API_CLIENT, DOMAIN, PRODUCTS
+from .const import API_CLIENT, DOMAIN, MODELS, PRODUCTS
 from .entity import EcoFlowBaseEntity
 from .products import BaseDevice, ProductType
 
@@ -602,32 +602,45 @@ class StatusSensorEntity(BaseSensorEntity):
 
     async def _check_device_availability(self, now: datetime) -> None:
         """Periodically check and update device availability."""
-        if self.device_entry is not None and not self.device_entry.disabled:
-            if self.state == "online":
-                if self.extra_state_attributes and self.extra_state_attributes.get(
-                    "last_updated"
-                ):
-                    device_online = now - self.extra_state_attributes[
-                        "last_updated"
-                    ] < timedelta(seconds=self._api.availability_check_interval_sec * 4)
-                    if not device_online:
-                        self._device.set_availability(device_online)
-                        self.hass.bus.fire(
-                            f"device_{self._device.serial_number}_availability", {}
-                        )
-                        super()._update_value("assume online")
+        if self.device_entry is None or self.device_entry.disabled:
+            return
 
-            # When the device stops transmitting data via MQTT for too long, keep polling data via HTTP in case the MQTT communication broke due to monthly server side updates at EcoFlows end
-            if self.state == "assume online":
-                if isinstance(self.device_entry, DeviceEntry) and isinstance(
-                    self.device_entry.serial_number, str
-                ):
-                    device_quota = await self._api.getDeviceQuota(
-                        self.device_entry.serial_number
-                    )
-                    self._api.data_holder.update_params(
-                        device_quota, self.device_entry.serial_number
-                    )
+        model = (
+            self._attr_device_info.get("model")
+            if isinstance(self._attr_device_info, dict)
+            else getattr(self._attr_device_info, "model", None)
+        )
+        serial_number = getattr(self.device_entry, "serial_number", None)
+
+        async def update_quota():
+            if isinstance(self.device_entry, DeviceEntry) and isinstance(
+                serial_number, str
+            ):
+                device_quota = await self._api.getDeviceQuota(serial_number)
+                self._api.data_holder.update_params(device_quota, serial_number)
+
+        # Always check for DELTA_MAX quota update. A future alternative could be subscribing to the set_reply topic and let it trigger update_quota
+        if model == MODELS[ProductType.DELTA_MAX]:
+            await update_quota()
+
+        # Check online status and handle fallback to "assume online"
+        elif self.extra_state_attributes and (
+            last_updated := self.extra_state_attributes.get("last_updated")
+        ):
+            offline_threshold = timedelta(
+                seconds=self._api.availability_check_interval_sec * 4
+            )
+            device_online = now - last_updated < offline_threshold
+            if not device_online:
+                self._device.set_availability(device_online)
+                self.hass.bus.fire(
+                    f"device_{self._device.serial_number}_availability", {}
+                )
+                super()._update_value("assume online")
+
+        # If in "assume online" state, keep polling quota
+        if self.state == "assume online":
+            await update_quota()
 
     def _update_value(self, val: Any) -> bool:
         self._device.set_availability(val)
