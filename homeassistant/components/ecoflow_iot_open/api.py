@@ -244,7 +244,7 @@ class EcoFlowIoTOpenAPIInterface:
     async def _subscribe_mqtt(
         self,
         client_cert: dict[str, Any],
-        topic_fn: Callable[[Any], str],
+        topic_fn: Callable[[str], list[str]],
         enabled_filter: Callable[[Any], bool],
         api_variant: str,
     ) -> None:
@@ -253,13 +253,6 @@ class EcoFlowIoTOpenAPIInterface:
         This method handles the connection to the MQTT broker and subscribes
         to the specified topics. It will attempt to reconnect if the connection
         is lost, up to a maximum number of reconnect attempts.
-
-        Args:
-            client_cert (dict[str, Any]): Client certification information.
-            topic_fn (Callable): Function to generate the topic for each device.
-            enabled_filter (Callable): Function to filter enabled devices.
-            api_variant (str): API variant to use ("open" or "app").
-
         """
         device_registry = dr.async_get(self.hass)
         enabled_devices = {
@@ -286,10 +279,11 @@ class EcoFlowIoTOpenAPIInterface:
                 ) as mqtt_client:
                     setattr(self, f"_{api_variant}_mqtt_client", mqtt_client)
                     topics: list[tuple[str, int]] = [
-                        (topic_fn(device.serial_number), 1)
+                        (topic, 1)
                         for devices in self._products.values()
                         for device in devices.values()
                         if device.serial_number in enabled_devices
+                        for topic in topic_fn(device.serial_number)
                     ]
                     if topics:
                         await mqtt_client.subscribe(topics)
@@ -298,7 +292,8 @@ class EcoFlowIoTOpenAPIInterface:
                                 await self._handle_mqtt_message(message)
                     else:
                         _LOGGER.warning(
-                            "No enabled devices found for MQTT subscription"
+                            "No enabled devices found for %s MQTT subscription",
+                            api_variant,
                         )
                         break
             except Exception as exception:
@@ -316,7 +311,7 @@ class EcoFlowIoTOpenAPIInterface:
                         is_fixable=True,
                         issue_domain=DOMAIN,
                         severity=IssueSeverity.ERROR,
-                        translation_key="_{api_variant}mqtt_connection",
+                        translation_key=f"_{api_variant}_mqtt_connection",
                         data={"entry_id": self._config_entry_id},
                         translation_placeholders={
                             "exception": f"{type(exception).__name__}: {exception}"
@@ -324,29 +319,39 @@ class EcoFlowIoTOpenAPIInterface:
                     )
                 await asyncio.sleep(5)
 
-    async def subscribe_open(self):
+    async def subscribe_open(self) -> None:
         """Subscribe to open MQTT topics, skipping disabled devices."""
         if not self._products:
             _LOGGER.error("No products found. Did you call setup before subscribing?")
             return
 
+        def topic_fn(serial_number: str) -> list[str]:
+            account = self._open_certification["certificateAccount"]
+            return [
+                f"/open/{account}/{serial_number}/status",
+                f"/open/{account}/{serial_number}/quota",
+            ]
+
         await self._subscribe_mqtt(
             client_cert=self._open_certification,
-            topic_fn=lambda serial_number: f"/open/{self._open_certification['certificateAccount']}/{serial_number}/status",
+            topic_fn=topic_fn,
             enabled_filter=lambda device: device.disabled_by is None
             and device.model != MODELS[ProductType.DELTA_MAX],
             api_variant="open",
         )
 
-    async def subscribe_app(self):
+    async def subscribe_app(self) -> None:
         """Subscribe to app MQTT topics, skipping disabled devices."""
         if not self._products:
             _LOGGER.error("No products found. Did you call setup before subscribing?")
             return
 
+        def topic_fn(serial_number: str) -> list[str]:
+            return [f"/app/device/property/{serial_number}"]
+
         await self._subscribe_mqtt(
             client_cert=self._app_mqtt_certification,
-            topic_fn=lambda serial_number: f"/app/device/property/{serial_number}",
+            topic_fn=topic_fn,
             enabled_filter=lambda device: device.disabled_by is None
             and device.model == MODELS[ProductType.DELTA_MAX],
             api_variant="app",
