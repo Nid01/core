@@ -422,6 +422,7 @@ class EcoFlowIoTOpenAPIInterface:
             if "param" in unpacked_json:
                 unpacked_json["params"] = unpacked_json.pop("param")
             if "addr" in unpacked_json and product_type in (
+                ProductType.POWERSTREAM,
                 ProductType.SINGLE_AXIS_SOLAR_TRACKER,
                 ProductType.SMART_PLUG,
             ):
