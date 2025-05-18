@@ -77,7 +77,12 @@ class BaseSelectEntity(SelectEntity, EcoFlowBaseCommandEntity):
         self._options_dict = options
 
     def _update_value(self, val: Any) -> bool:
-        if self._attr_name in ("pd.standByMode", "pd.lcdOffSec", "inv.cfgStandbyMin"):
+        if self._attr_name in (
+            "iot.supplyPriority",
+            "inv.cfgStandbyMin",
+            "pd.standByMode",
+            "pd.lcdOffSec",
+        ):
             ival = int(val)
             if isinstance(self._options_dict, dict):
                 lval = [k for k, v in self._options_dict.items() if v == ival]
@@ -147,6 +152,20 @@ class LightTrackingSensitivitySelectEntity(BaseSelectEntity):
             if index == 3:
                 return "mdi:brightness-7"
         return "mdi:brightness-5"
+
+
+class PowerSupplyPrioritySelectEntity(BaseSelectEntity):
+    """Power supply priority select entity."""
+
+    @property
+    def icon(self) -> str | None:
+        """Return the icon to be used for this entity."""
+
+        if self.state in self._attr_options:
+            index = self._attr_options.index(self.state)
+            if index == 1:
+                return "mdi:battery-charging"
+        return "mdi:home-lightning-bolt"
 
 
 class ScenarioSelectEntity(BaseSelectEntity):

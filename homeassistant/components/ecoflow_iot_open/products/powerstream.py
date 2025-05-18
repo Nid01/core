@@ -12,7 +12,7 @@ from ..number import (
     BrightnessNumberEntity,
     PowerNumberEntity,
 )
-from ..select import SelectEntity
+from ..select import PowerSupplyPrioritySelectEntity, SelectEntity
 from ..sensor import (
     BaseSensorEntity,
     BatterySensorEntity,
@@ -27,7 +27,7 @@ from ..sensor import (
     TimestampSensorEntity,
     VoltageSensorEntity,
 )
-from ..switch import BaseSwitchEntity, PowerSupplyPriorityEntity
+from ..switch import BaseSwitchEntity
 from . import BaseDevice
 
 
@@ -97,7 +97,21 @@ class PowerStream(BaseDevice):
     def selects(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[SelectEntity]:
         """Available selects for PowerStream."""
 
-        return []
+        return [
+            PowerSupplyPrioritySelectEntity(
+                api,
+                self,
+                "iot.supplyPriority",
+                command=lambda value: {
+                    "cmdCode": "WN511_SET_SUPPLY_PRIORITY_PACK",
+                    "params": {"supplyPriority": value},
+                },
+                options={
+                    "power supply": 0,
+                    "power storage": 1,
+                },
+            ),
+        ]
 
     def sensors(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[BaseSensorEntity]:
         """Available sensors for PowerStream."""
@@ -160,7 +174,6 @@ class PowerStream(BaseDevice):
             "iot.invOutputWatts",
             "iot.invToOtherWatts",
             "iot.invToPlugWatts",
-            "iot.permanentWatts",
             "iot.plugTotalWatts",
             "iot.pv1InputWatts",
             "iot.pv2InputWatts",
@@ -354,17 +367,7 @@ class PowerStream(BaseDevice):
     def switches(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[BaseSwitchEntity]:
         """Available switches for PowerStream."""
 
-        return [
-            PowerSupplyPriorityEntity(
-                api,
-                self,
-                "iot.supplyPriority",
-                command=lambda value: {
-                    "cmdCode": "WN511_SET_SUPPLY_PRIORITY_PACK",
-                    "params": {"supplyPriority": value},
-                },
-            ),
-        ]
+        return []
 
     # def datetimes(...)..
     # DateTimeEntity(dataHolder, self, "iot.updateTime"),

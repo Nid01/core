@@ -137,17 +137,6 @@ class DeviceSwitchEntity(BaseSwitchEntity):
         return super()._update_value(val != 0)
 
 
-class PowerSupplyPriorityEntity(BaseSwitchEntity):
-    """Power supply priority switch."""
-
-    @property
-    def icon(self) -> str | None:
-        """Return the icon to be used for this entity."""
-        if self.is_on:
-            return "mdi:battery-charging"
-        return "mdi:home-lightning-bolt"
-
-
 class RainProtectionSwitchEntity(BaseSwitchEntity):
     """Switch for rain protection."""
 
