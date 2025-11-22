@@ -63,7 +63,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         )
         await api.certification()
     except (InvalidCredentialsError, KeyError):
-        _LOGGER.error("Invalid credentials provided")
+        _LOGGER.exception("Invalid credentials provided")
         return False
     except EcoFlowIoTOpenError as err:
         raise ConfigEntryNotReady from err
