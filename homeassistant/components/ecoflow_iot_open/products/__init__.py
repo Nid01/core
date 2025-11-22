@@ -19,22 +19,32 @@ _LOGGER = logging.getLogger(__name__)
 class BaseDevice(ABC):
     """Base device for EcoFlow products."""
 
-    def __init__(self, device_info: dict, api_interface) -> None:
+    def __init__(self, device_info: dict[str, Any], api_interface) -> None:
         """Initialize."""
         self._available = bool(device_info.get("online"))
         self._api = api_interface
         self._device_info: dict[str, Any] = device_info
         self._model: str
+        self._quota_allowed: bool = bool(device_info.get("quota_allowed", True))
 
     def set_availability(self, available: bool) -> None:
         """Set availability status for the device."""
         self._available = available
+
+    def set_quota_allowed(self, quota_allowed: bool) -> None:
+        """Set quota allowed status for the device.
+
+        Nesserary since EcoFlow decided to lock out devices which aren't officially supported from the iot "open" API (yet?).
+        https://www.reddit.com/r/Ecoflow_community/comments/1lzp7qa/comment/n3e0tkn/
+        """
+        self._quota_allowed = quota_allowed
 
     def discard_unnecessary_keys(self, keys: set) -> set:
         """Discard unnecessary device info keys from set."""
         keys.discard("deviceName")
         keys.discard("online")
         keys.discard("productName")
+        keys.discard("quota_allowed")
         keys.discard("sn")
         return keys
 
@@ -99,6 +109,11 @@ class BaseDevice(ABC):
     def model(self) -> str:
         """Return the model name."""
         return self._model
+
+    @property
+    def is_quota_allowed(self) -> bool:
+        """Return the possibility to use the HTTP quota endpoint."""
+        return self._quota_allowed
 
     def is_available(self) -> bool:
         """Return the current device availability."""
