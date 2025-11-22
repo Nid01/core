@@ -178,7 +178,7 @@ class SingleAxisSolarTracker(BaseDevice):
     def sensors(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[SensorEntity]:
         """Available sensors for Single Axis Solar Tracker."""
 
-        device_info_keys = self.remove_unnecessary_keys(set(self._device_info.keys()))
+        device_info_keys = self.discard_unnecessary_keys(set(self._device_info.keys()))
 
         angle_keys = [
             "iot.angle",

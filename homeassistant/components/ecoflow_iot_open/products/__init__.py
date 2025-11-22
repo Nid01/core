@@ -30,12 +30,12 @@ class BaseDevice(ABC):
         """Set availability status for the device."""
         self._available = available
 
-    def remove_unnecessary_keys(self, keys: set) -> set:
-        """Remove unnecessary device info keys from set."""
-        keys.remove("deviceName")
-        keys.remove("online")
-        keys.remove("productName")
-        keys.remove("sn")
+    def discard_unnecessary_keys(self, keys: set) -> set:
+        """Discard unnecessary device info keys from set."""
+        keys.discard("deviceName")
+        keys.discard("online")
+        keys.discard("productName")
+        keys.discard("sn")
         return keys
 
     async def prepare_protobuf_message(self, command: dict[str, Any]) -> bytes | None:

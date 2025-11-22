@@ -116,7 +116,7 @@ class PowerStream(BaseDevice):
     def sensors(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[BaseSensorEntity]:
         """Available sensors for PowerStream."""
 
-        device_info_keys = self.remove_unnecessary_keys(set(self._device_info.keys()))
+        device_info_keys = self.discard_unnecessary_keys(set(self._device_info.keys()))
 
         current_keys = [
             "iot.batInputCur",

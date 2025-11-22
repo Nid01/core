@@ -65,7 +65,7 @@ class SmartPlug(BaseDevice):
     def sensors(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[SensorEntity]:
         """Available sensors for Smart Plug."""
 
-        device_info_keys = self.remove_unnecessary_keys(set(self._device_info.keys()))
+        device_info_keys = self.discard_unnecessary_keys(set(self._device_info.keys()))
 
         current_keys = [
             "iot.current",
