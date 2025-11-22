@@ -34,7 +34,12 @@ from homeassistant.util.ssl import get_default_context
 
 from .const import DEFAULT_AVAILABILITY_CHECK_INTERVAL_SEC, DOMAIN, MODELS, ProductType
 from .data_holder import EcoFlowIoTOpenDataHolder
-from .errors import EcoFlowIoTOpenError, GenericHTTPError, InvalidResponseFormat
+from .errors import (
+    DeviceNotAllowedError,
+    EcoFlowIoTOpenError,
+    GenericHTTPError,
+    InvalidResponseFormat,
+)
 from .products import BaseDevice
 
 _LOGGER = logging.getLogger(__name__)
@@ -102,9 +107,20 @@ class EcoFlowIoTOpenAPIInterface:
         product_types: list[ProductType],
         config_entry: ConfigEntry,
     ) -> None:
-        """Process device information and adds it to filtered_products if it matches the specified types."""
-        device_quota = await self.getDeviceQuota(device_info["sn"])
-        device_info.update(device_quota)
+        """Process device information and add it to filtered_products if it matches the specified product types."""
+
+        try:
+            device_quota = await self.getDeviceQuota(device_info["sn"])
+            device_info.update(device_quota)
+            device_info["quota_allowed"] = True
+        except DeviceNotAllowedError as exception:
+            _LOGGER.warning(
+                "%s - %s  - serial number: %s",
+                exception.args,
+                device_info.get("deviceName", device_info["productName"]),
+                device_info["sn"],
+            )
+            device_info["quota_allowed"] = False
         device_info["status"] = device_info["online"]
 
         product_type = BaseDevice.get_product_type_from_serial_number(device_info["sn"])
@@ -482,9 +498,12 @@ class EcoFlowIoTOpenAPIInterface:
         if isinstance(self.data_holder, EcoFlowIoTOpenDataHolder):
             for devices in self._products.values():
                 for device in devices.values():
-                    quota_data = await self.getDeviceQuota(device.serial_number)
+                    quota_data: dict[str, Any] = {}
+                    if device.is_quota_allowed:
+                        quota_data = await self.getDeviceQuota(device.serial_number)
+                        quota_data["last_updated"] = utcnow()
+                    quota_data["quota_allowed"] = device.is_quota_allowed
                     quota_data["status"] = device.is_available()
-                    quota_data["last_updated"] = utcnow()
                     self.data_holder.update_params(
                         raw=quota_data, serial_number=device.serial_number
                     )
@@ -538,6 +557,15 @@ class EcoFlowIoTOpenAPIInterface:
             if response.status == 200:
                 try:
                     response_json = await response.json()
+
+                    if response_json["code"] == "1006":
+                        raise DeviceNotAllowedError(
+                            f"response code: {response_json['code']} - message: {response_json['message']}"
+                        )
+                    if response_json["code"] != "0":
+                        raise EcoFlowIoTOpenError(
+                            f"response code: {response_json['code']} - message: {response_json['message']}"
+                        )
                     sorted_response = recursively_sort_dict(response_json)
                 except json.JSONDecodeError as exc:
                     _LOGGER.error(
