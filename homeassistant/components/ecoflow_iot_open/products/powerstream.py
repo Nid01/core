@@ -359,7 +359,9 @@ class PowerStream(BaseDevice):
             FrequencySensorEntity(api, self, "iot.invFreq", 10),
             *power_sensors,
             *voltage_sensors,
-            StatusSensorEntity(api, self, "status").attr("last_updated"),
+            StatusSensorEntity(api, self, "status")
+            .attr("last_updated")
+            .attr("quota_allowed"),
             *temperature_sensors,
             *timestamp_sensors,
         ]

@@ -201,32 +201,27 @@ class DELTAMax(BaseDevice):
             # ("kit.productInfoDetails", 1, "soc"),
         ]
 
-        battery_sensors = [
-            BatterySensorEntity(api, self, key)
-            for key in battery_keys
-            if key in device_info_keys
-        ]
+        battery_sensors = self.make_sensors(
+            battery_keys, lambda key: BatterySensorEntity(api, self, key)
+        )
 
         binary_state_keys = [
             "inv.fanState",
         ]
 
-        binary_state_sensors = [
-            BinaryStateSensorEntity(api, self, key)
-            for key in binary_state_keys
-            if key in device_info_keys
-        ]
+        binary_state_sensors = self.make_sensors(
+            binary_state_keys, lambda key: BinaryStateSensorEntity(api, self, key)
+        )
 
         charging_state_keys = [
             "pd.sysChgDsgState",
             "ems.chgState",
         ]
 
-        charging_state_sensors = [
-            ChargingStateSensorEntity(api, self, key)
-            for key in charging_state_keys
-            if key in device_info_keys
-        ]
+        charging_state_sensors = self.make_sensors(
+            charging_state_keys,
+            lambda key: ChargingStateSensorEntity(api, self, key),
+        )
 
         current_keys = [
             "bmsMaster.amp",
@@ -248,27 +243,24 @@ class DELTAMax(BaseDevice):
             "mppt.carOutAmp": UnitOfElectricCurrent.MILLIAMPERE,
         }
 
-        current_sensors = [
-            CurrentSensorEntity(
+        current_sensors = self.make_sensors(
+            current_keys,
+            lambda key: CurrentSensorEntity(
                 api,
                 self,
                 key,
                 current_units.get(key, UnitOfElectricCurrent.AMPERE),
-            )
-            for key in current_keys
-            if key in device_info_keys
-        ]
+            ),
+        )
 
         cycles_keys = [
             "bmsMaster.cycles",
             "bmsSlave1.cycles",
         ]
 
-        cycles_sensors = [
-            CyclesSensorEntity(api, self, key)
-            for key in cycles_keys
-            if key in device_info_keys
-        ]
+        cycles_sensors = self.make_sensors(
+            cycles_keys, lambda key: CyclesSensorEntity(api, self, key)
+        )
 
         energy_keys = [
             "pd.chgPowerAc",
@@ -278,11 +270,9 @@ class DELTAMax(BaseDevice):
             "pd.dsgPowerDc",
         ]
 
-        energy_sensors = [
-            EnergySensorEntity(api, self, key)
-            for key in energy_keys
-            if key in device_info_keys
-        ]
+        energy_sensors = self.make_sensors(
+            energy_keys, lambda key: EnergySensorEntity(api, self, key)
+        )
 
         energy_storage_keys = [
             "bmsMaster.designCap",
@@ -293,11 +283,10 @@ class DELTAMax(BaseDevice):
             "bmsSlave1.remainCap",
         ]
 
-        energy_storage_sensors = [
-            EnergyStorageSensorEntity(api, self, key)
-            for key in energy_storage_keys
-            if key in device_info_keys
-        ]
+        energy_storage_sensors = self.make_sensors(
+            energy_storage_keys,
+            lambda key: EnergyStorageSensorEntity(api, self, key),
+        )
 
         duration_keys = [
             "bmsMaster.remainTime",
@@ -318,16 +307,12 @@ class DELTAMax(BaseDevice):
             "pd.lcdOffSec": UnitOfTime.SECONDS,
         }
 
-        duration_sensors = [
-            DurationSensorEntity(
-                api,
-                self,
-                key,
-                duration_units.get(key, UnitOfTime.MINUTES),
-            )
-            for key in duration_keys
-            if key in device_info_keys
-        ]
+        duration_sensors = self.make_sensors(
+            duration_keys,
+            lambda key: DurationSensorEntity(
+                api, self, key, duration_units.get(key, UnitOfTime.MINUTES)
+            ),
+        )
 
         power_keys = [
             "bmsMaster.inputWatts",
@@ -361,16 +346,10 @@ class DELTAMax(BaseDevice):
             "mppt.outWatts": 0.1,
         }
 
-        power_sensors = [
-            PowerSensorEntity(
-                api,
-                self,
-                key,
-                power_factors.get(key, 1),
-            )
-            for key in power_keys
-            if key in device_info_keys
-        ]
+        power_sensors = self.make_sensors(
+            power_keys,
+            lambda key: PowerSensorEntity(api, self, key, power_factors.get(key, 1)),
+        )
 
         temperature_keys = [
             "bmsMaster.maxCellTemp",
@@ -397,11 +376,9 @@ class DELTAMax(BaseDevice):
             "pd.typec2Temp",
         ]
 
-        temperature_sensors = [
-            TemperateSensorEntity(api, self, key)
-            for key in temperature_keys
-            if key in device_info_keys
-        ]
+        temperature_sensors = self.make_sensors(
+            temperature_keys, lambda key: TemperateSensorEntity(api, self, key)
+        )
 
         add_cell_sensors(
             "bmsMaster.cellTemp", temperature_sensors, TemperateSensorEntity
@@ -436,11 +413,9 @@ class DELTAMax(BaseDevice):
             "mppt.outVol",
         ]
 
-        voltage_sensors = [
-            VoltageSensorEntity(api, self, key)
-            for key in voltage_keys
-            if key in device_info_keys
-        ]
+        voltage_sensors = self.make_sensors(
+            voltage_keys, lambda key: VoltageSensorEntity(api, self, key)
+        )
 
         add_cell_sensors("bmsMaster.cellVol", voltage_sensors, VoltageSensorEntity)
         add_cell_sensors("bmsSlave1.cellVol", voltage_sensors, VoltageSensorEntity)
@@ -598,7 +573,9 @@ class DELTAMax(BaseDevice):
             *energy_storage_sensors,
             *power_sensors,
             *product_info_detail_sensors,
-            StatusSensorEntity(api, self, "status").attr("last_updated"),
+            StatusSensorEntity(api, self, "status")
+            .attr("last_updated")
+            .attr("quota_allowed"),
             *temperature_sensors,
             *voltage_sensors,
         ]

@@ -146,7 +146,9 @@ class SmartPlug(BaseDevice):
             DurationSensorEntity(api, self, "iot.runTime", UnitOfTime.SECONDS),
             FrequencySensorEntity(api, self, "iot.freq"),
             *power_sensors,
-            StatusSensorEntity(api, self, "status").attr("last_updated"),
+            StatusSensorEntity(api, self, "status")
+            .attr("last_updated")
+            .attr("quota_allowed"),
             TemperateSensorEntity(api, self, "iot.temp"),
             *timestamp_sensors,
             VoltageSensorEntity(api, self, "iot.volt"),

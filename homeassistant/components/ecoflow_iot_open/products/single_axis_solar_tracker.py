@@ -185,15 +185,9 @@ class SingleAxisSolarTracker(BaseDevice):
             "iot.angleManual",
         ]
 
-        angle_sensors = [
-            AngleSensorEntity(
-                api,
-                self,
-                key,
-            )
-            for key in angle_keys
-            if key in device_info_keys
-        ]
+        angle_sensors = self.make_sensors(
+            angle_keys, lambda key: AngleSensorEntity(api, self, key)
+        )
 
         ignored_keys = [
             "iot.angleTarget",
@@ -237,7 +231,9 @@ class SingleAxisSolarTracker(BaseDevice):
             IlluminanceSensorEntity(api, self, "iot.lux"),
             IlluminanceGradeSensorEntity(api, self, "iot.luxGrade"),
             ModeAsWordSensorEntity(api, self, "iot.word"),
-            StatusSensorEntity(api, self, "status").attr("last_updated"),
+            StatusSensorEntity(api, self, "status")
+            .attr("last_updated")
+            .attr("quota_allowed"),
             TemperateSensorEntity(api, self, "iot.batteryTemperature"),
             WaterSensorEntity(api, self, "iot.water", title="water detection"),
             WindSensorEntity(api, self, "iot.wind", title="wind detection"),

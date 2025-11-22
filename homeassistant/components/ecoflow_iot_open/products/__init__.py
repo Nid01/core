@@ -1,7 +1,7 @@
 """Base device for EcoFlow products."""
 
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 import logging
 from typing import Any
 
@@ -51,6 +51,22 @@ class BaseDevice(ABC):
     async def prepare_protobuf_message(self, command: dict[str, Any]) -> bytes | None:
         """Prepare the protobuf message for the device."""
         return None
+
+    def make_sensors(
+        self, keys: Sequence[str], factory: Callable[[str], SensorEntity]
+    ) -> list[SensorEntity]:
+        """Create sensor entities from `keys` using `factory`.
+
+        If `self.is_quota_allowed` is truthy, create sensors for all
+        provided `keys`. Otherwise, only create sensors for keys that
+        are present in the device info
+        """
+        device_info_keys = set(self._device_info.keys())
+        if self.is_quota_allowed:
+            iterable = [k for k in keys if k in device_info_keys]
+        else:
+            iterable = list(keys)
+        return [factory(k) for k in iterable]
 
     @abstractmethod
     def buttons(self, api) -> Sequence[ButtonEntity]:  # Sequence[BaseButtonEntity]:
