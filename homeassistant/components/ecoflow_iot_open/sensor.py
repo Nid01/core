@@ -602,11 +602,13 @@ class StatusSensorEntity(BaseSensorEntity):
 
     async def _check_device_availability(self, now: datetime) -> None:
         """Periodically check and update device availability."""
-        if self.device_entry is not None and not self.device_entry.disabled:
+        if (
+            self.device_entry is not None
+            and not self.device_entry.disabled
+            and self.extra_state_attributes
+        ):
             if self.state == "online":
-                if self.extra_state_attributes and self.extra_state_attributes.get(
-                    "last_updated"
-                ):
+                if self.extra_state_attributes.get("last_updated"):
                     device_online = now - self.extra_state_attributes[
                         "last_updated"
                     ] < timedelta(seconds=self._api.availability_check_interval_sec * 4)
@@ -622,12 +624,15 @@ class StatusSensorEntity(BaseSensorEntity):
                 if isinstance(self.device_entry, DeviceEntry) and isinstance(
                     self.device_entry.serial_number, str
                 ):
-                    device_quota = await self._api.getDeviceQuota(
-                        self.device_entry.serial_number
-                    )
-                    self._api.data_holder.update_params(
-                        device_quota, self.device_entry.serial_number
-                    )
+                    device_quota: dict[str, Any] = {}
+
+                    if self.extra_state_attributes.get("quota_allowed", True):
+                        device_quota = await self._api.getDeviceQuota(
+                            self.device_entry.serial_number
+                        )
+                        self._api.data_holder.update_params(
+                            device_quota, self.device_entry.serial_number
+                        )
 
     def _update_value(self, val: Any) -> bool:
         self._device.set_availability(val)
