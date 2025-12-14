@@ -64,7 +64,7 @@ PROGRAM_TO_SPEED: dict[int, str] = {
 }
 
 
-class MieleVacuumStateCode(MieleEnum):
+class MieleVacuumStateCode(MieleEnum, missing_to_none=True):
     """Define vacuum state codes."""
 
     idle = 0
@@ -82,12 +82,10 @@ class MieleVacuumStateCode(MieleEnum):
     blocked_front_wheel = 5900
     docked = 5903, 5904
     remote_controlled = 5910
-    missing2none = -9999
 
 
 SUPPORTED_FEATURES = (
     VacuumEntityFeature.STATE
-    | VacuumEntityFeature.BATTERY
     | VacuumEntityFeature.FAN_SPEED
     | VacuumEntityFeature.START
     | VacuumEntityFeature.STOP
@@ -141,21 +139,21 @@ async def async_setup_entry(
 
 
 VACUUM_PHASE_TO_ACTIVITY = {
-    MieleVacuumStateCode.idle: VacuumActivity.IDLE,
-    MieleVacuumStateCode.docked: VacuumActivity.DOCKED,
-    MieleVacuumStateCode.cleaning: VacuumActivity.CLEANING,
-    MieleVacuumStateCode.going_to_target_area: VacuumActivity.CLEANING,
-    MieleVacuumStateCode.returning: VacuumActivity.RETURNING,
-    MieleVacuumStateCode.wheel_lifted: VacuumActivity.ERROR,
-    MieleVacuumStateCode.dirty_sensors: VacuumActivity.ERROR,
-    MieleVacuumStateCode.dust_box_missing: VacuumActivity.ERROR,
-    MieleVacuumStateCode.blocked_drive_wheels: VacuumActivity.ERROR,
-    MieleVacuumStateCode.blocked_brushes: VacuumActivity.ERROR,
-    MieleVacuumStateCode.check_dust_box_and_filter: VacuumActivity.ERROR,
-    MieleVacuumStateCode.internal_fault_reboot: VacuumActivity.ERROR,
-    MieleVacuumStateCode.blocked_front_wheel: VacuumActivity.ERROR,
-    MieleVacuumStateCode.paused: VacuumActivity.PAUSED,
-    MieleVacuumStateCode.remote_controlled: VacuumActivity.PAUSED,
+    MieleVacuumStateCode.idle.value: VacuumActivity.IDLE,
+    MieleVacuumStateCode.docked.value: VacuumActivity.DOCKED,
+    MieleVacuumStateCode.cleaning.value: VacuumActivity.CLEANING,
+    MieleVacuumStateCode.going_to_target_area.value: VacuumActivity.CLEANING,
+    MieleVacuumStateCode.returning.value: VacuumActivity.RETURNING,
+    MieleVacuumStateCode.wheel_lifted.value: VacuumActivity.ERROR,
+    MieleVacuumStateCode.dirty_sensors.value: VacuumActivity.ERROR,
+    MieleVacuumStateCode.dust_box_missing.value: VacuumActivity.ERROR,
+    MieleVacuumStateCode.blocked_drive_wheels.value: VacuumActivity.ERROR,
+    MieleVacuumStateCode.blocked_brushes.value: VacuumActivity.ERROR,
+    MieleVacuumStateCode.check_dust_box_and_filter.value: VacuumActivity.ERROR,
+    MieleVacuumStateCode.internal_fault_reboot.value: VacuumActivity.ERROR,
+    MieleVacuumStateCode.blocked_front_wheel.value: VacuumActivity.ERROR,
+    MieleVacuumStateCode.paused.value: VacuumActivity.PAUSED,
+    MieleVacuumStateCode.remote_controlled.value: VacuumActivity.PAUSED,
 }
 
 
@@ -171,13 +169,8 @@ class MieleVacuum(MieleEntity, StateVacuumEntity):
     def activity(self) -> VacuumActivity | None:
         """Return activity."""
         return VACUUM_PHASE_TO_ACTIVITY.get(
-            MieleVacuumStateCode(self.device.state_program_phase)
+            MieleVacuumStateCode(self.device.state_program_phase).value
         )
-
-    @property
-    def battery_level(self) -> int | None:
-        """Return the battery level."""
-        return self.device.state_battery_level
 
     @property
     def fan_speed(self) -> str | None:
@@ -196,14 +189,15 @@ class MieleVacuum(MieleEntity, StateVacuumEntity):
         """Send action to the device."""
         try:
             await self.api.send_action(device_id, action)
-        except ClientResponseError as ex:
+        except ClientResponseError as err:
+            _LOGGER.debug("Error setting vacuum state for %s: %s", self.entity_id, err)
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="set_state_error",
                 translation_placeholders={
                     "entity": self.entity_id,
                 },
-            ) from ex
+            ) from err
 
     async def async_clean_spot(self, **kwargs: Any) -> None:
         """Clean spot."""

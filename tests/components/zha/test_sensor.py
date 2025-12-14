@@ -1,9 +1,12 @@
 """Test ZHA sensor."""
 
+from collections.abc import Callable, Coroutine
 from unittest.mock import patch
 
 import pytest
+from zigpy.device import Device
 from zigpy.profiles import zha
+from zigpy.quirks.v2 import QuirkBuilder
 from zigpy.zcl import Cluster
 from zigpy.zcl.clusters import general, homeautomation, hvac, measurement, smartenergy
 from zigpy.zcl.clusters.hvac import Thermostat
@@ -62,10 +65,10 @@ async def async_test_temperature(hass: HomeAssistant, cluster: Cluster, entity_i
 async def async_test_pressure(hass: HomeAssistant, cluster: Cluster, entity_id: str):
     """Test pressure sensor."""
     await send_attributes_report(hass, cluster, {1: 1, 0: 1000, 2: 10000})
-    assert_state(hass, entity_id, "1000.0", UnitOfPressure.HPA)
+    assert_state(hass, entity_id, "1000", UnitOfPressure.HPA)
 
     await send_attributes_report(hass, cluster, {0: 1000, 20: -1, 16: 10000})
-    assert_state(hass, entity_id, "1000.0", UnitOfPressure.HPA)
+    assert_state(hass, entity_id, "1000", UnitOfPressure.HPA)
 
 
 async def async_test_illuminance(hass: HomeAssistant, cluster: Cluster, entity_id: str):
@@ -211,17 +214,17 @@ async def async_test_em_power_factor(
     # update divisor cached value
     await send_attributes_report(hass, cluster, {"ac_power_divisor": 1})
     await send_attributes_report(hass, cluster, {0: 1, 0x0510: 100, 10: 1000})
-    assert_state(hass, entity_id, "100.0", PERCENTAGE)
+    assert_state(hass, entity_id, "100", PERCENTAGE)
 
     await send_attributes_report(hass, cluster, {0: 1, 0x0510: 99, 10: 1000})
-    assert_state(hass, entity_id, "99.0", PERCENTAGE)
+    assert_state(hass, entity_id, "99", PERCENTAGE)
 
     await send_attributes_report(hass, cluster, {"ac_power_divisor": 10})
     await send_attributes_report(hass, cluster, {0: 1, 0x0510: 100, 10: 5000})
-    assert_state(hass, entity_id, "100.0", PERCENTAGE)
+    assert_state(hass, entity_id, "100", PERCENTAGE)
 
     await send_attributes_report(hass, cluster, {0: 1, 0x0510: 99, 10: 5000})
-    assert_state(hass, entity_id, "99.0", PERCENTAGE)
+    assert_state(hass, entity_id, "99", PERCENTAGE)
 
 
 async def async_test_em_rms_current(
@@ -317,7 +320,7 @@ async def async_test_pi_heating_demand(
     await send_attributes_report(
         hass, cluster, {Thermostat.AttributeDefs.pi_heating_demand.id: 1}
     )
-    assert_state(hass, entity_id, "1.0", "%")
+    assert_state(hass, entity_id, "1", "%")
 
 
 @pytest.mark.parametrize(
@@ -519,8 +522,8 @@ async def async_test_pi_heating_demand(
 )
 async def test_sensor(
     hass: HomeAssistant,
-    setup_zha,
-    zigpy_device_mock,
+    setup_zha: Callable[..., Coroutine[None]],
+    zigpy_device_mock: Callable[..., Device],
     cluster_id,
     entity_suffix,
     test_func,
@@ -579,6 +582,125 @@ async def test_sensor(
 
     # test sensor associated logic
     await test_func(hass, cluster, entity_id)
+
+
+@pytest.mark.parametrize(
+    (
+        "translation_key",
+        "fallback_name",
+        "device_class",
+        "unit",
+        "entity_id_suffix",
+        "expected_friendly_name_suffix",
+    ),
+    [
+        (
+            "this_translation_key_is_not_translated",
+            "Software build",
+            None,
+            None,
+            "software_build",
+            "Software build",
+        ),
+        (
+            "device_status",
+            "I should not be used",
+            None,
+            None,
+            "device_status",
+            "Device status",
+        ),
+        (
+            "this_translation_key_is_not_translated",
+            "Product url",
+            SensorDeviceClass.TEMPERATURE,
+            UnitOfTemperature.CELSIUS,
+            "product_url",
+            "Product url",
+        ),
+        (
+            "device_temperature",
+            "I should not be used",
+            SensorDeviceClass.TEMPERATURE,
+            UnitOfTemperature.CELSIUS,
+            "device_temperature",
+            "Device temperature",
+        ),
+        (
+            None,
+            "I should not be used",
+            SensorDeviceClass.BATTERY,
+            PERCENTAGE,
+            "battery",
+            "Battery",
+        ),
+    ],
+)
+async def test_sensor_name(
+    hass: HomeAssistant,
+    setup_zha: Callable[..., Coroutine[None]],
+    zigpy_device_mock: Callable[..., Device],
+    translation_key: str | None,
+    fallback_name: str,
+    device_class: SensorDeviceClass | None,
+    unit: str | None,
+    entity_id_suffix: str,
+    expected_friendly_name_suffix: str,
+) -> None:
+    """Test ZHA entity name generation.
+
+    This test sets up a v2 quirks sensor with various combinations of
+    translation key, fallback name, and device class to verify that the
+    entity's friendly name is generated correctly.
+
+    Built-in quirks have translations in HA, so those are used.
+    Custom quirks with new translation keys won't have translations.
+    For them, the fallback name should be used instead.
+    If a device class is set but no translation key,
+    the device class name is used.
+    """
+    (
+        QuirkBuilder("Test Manf", "Test Model")
+        .sensor(
+            attribute_name="product_label",  # doesn't matter for this test
+            cluster_id=general.Basic.cluster_id,
+            translation_key=translation_key,
+            fallback_name=fallback_name,
+            device_class=device_class,
+            unit=unit,
+        )
+        .add_to_registry()
+    )
+
+    await setup_zha()
+    gateway = get_zha_gateway(hass)
+
+    zigpy_device = zigpy_device_mock(
+        {
+            1: {
+                SIG_EP_INPUT: [general.Basic.cluster_id],
+                SIG_EP_OUTPUT: [],
+                SIG_EP_TYPE: zha.DeviceType.ON_OFF_SWITCH,
+                SIG_EP_PROFILE: zha.PROFILE_ID,
+            }
+        },
+        manufacturer="Test Manf",
+        model="Test Model",
+    )
+
+    gateway.get_or_create_device(zigpy_device)
+    await gateway.async_device_initialized(zigpy_device)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    entity_id = f"sensor.test_manf_test_model_{entity_id_suffix}"
+    hass_state = hass.states.get(entity_id)
+    assert hass_state is not None
+
+    # Check that the friendly name matches the expected name.
+    assert (
+        hass_state.attributes.get("friendly_name")
+        == f"Test Manf Test Model {expected_friendly_name_suffix}"
+    )
 
 
 def assert_state(hass: HomeAssistant, entity_id, state, unit_of_measurement):

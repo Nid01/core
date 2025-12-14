@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from typing import cast
 
 from pylamarzocco import LaMarzoccoMachine
-from pylamarzocco.const import BackFlushStatus, MachineState, WidgetType
-from pylamarzocco.models import BackFlush, MachineStatus
+from pylamarzocco.const import BackFlushStatus, MachineState, ModelName, WidgetType
+from pylamarzocco.models import BackFlush, MachineStatus, NoWater
 
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
@@ -39,8 +39,15 @@ ENTITIES: tuple[LaMarzoccoBinarySensorEntityDescription, ...] = (
         key="water_tank",
         translation_key="water_tank",
         device_class=BinarySensorDeviceClass.PROBLEM,
-        is_on_fn=lambda machine: WidgetType.CM_NO_WATER in machine.dashboard.config,
+        is_on_fn=(
+            lambda machine: cast(
+                NoWater, machine.dashboard.config[WidgetType.CM_NO_WATER]
+            ).allarm
+            if WidgetType.CM_NO_WATER in machine.dashboard.config
+            else False
+        ),
         entity_category=EntityCategory.DIAGNOSTIC,
+        bt_offline_mode=True,
     ),
     LaMarzoccoBinarySensorEntityDescription(
         key="brew_active",
@@ -61,11 +68,17 @@ ENTITIES: tuple[LaMarzoccoBinarySensorEntityDescription, ...] = (
         device_class=BinarySensorDeviceClass.RUNNING,
         is_on_fn=(
             lambda machine: cast(
-                BackFlush, machine.dashboard.config[WidgetType.CM_BACK_FLUSH]
+                BackFlush,
+                machine.dashboard.config.get(
+                    WidgetType.CM_BACK_FLUSH, BackFlush(status=BackFlushStatus.OFF)
+                ),
             ).status
-            is BackFlushStatus.REQUESTED
+            in (BackFlushStatus.REQUESTED, BackFlushStatus.CLEANING)
         ),
         entity_category=EntityCategory.DIAGNOSTIC,
+        supported_fn=lambda coordinator: (
+            coordinator.device.dashboard.model_name is not ModelName.GS3_MP
+        ),
     ),
     LaMarzoccoBinarySensorEntityDescription(
         key="websocket_connected",
@@ -87,7 +100,9 @@ async def async_setup_entry(
     coordinator = entry.runtime_data.config_coordinator
 
     async_add_entities(
-        LaMarzoccoBinarySensorEntity(coordinator, description)
+        LaMarzoccoBinarySensorEntity(
+            coordinator, description, entry.runtime_data.bluetooth_coordinator
+        )
         for description in ENTITIES
         if description.supported_fn(coordinator)
     )

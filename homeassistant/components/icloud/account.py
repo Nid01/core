@@ -12,6 +12,7 @@ from pyicloud.exceptions import (
     PyiCloudFailedLoginException,
     PyiCloudNoDevicesException,
     PyiCloudServiceNotActivatedException,
+    PyiCloudServiceUnavailable,
 )
 from pyicloud.services.findmyiphone import AppleDevice
 
@@ -58,6 +59,8 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+type IcloudConfigEntry = ConfigEntry[IcloudAccount]
+
 
 class IcloudAccount:
     """Representation of an iCloud account."""
@@ -71,7 +74,7 @@ class IcloudAccount:
         with_family: bool,
         max_interval: int,
         gps_accuracy_threshold: int,
-        config_entry: ConfigEntry,
+        config_entry: IcloudConfigEntry,
     ) -> None:
         """Initialize an iCloud account."""
         self.hass = hass
@@ -123,21 +126,26 @@ class IcloudAccount:
             return
 
         try:
-            api_devices = self.api.devices
             # Gets device owners infos
-            user_info = api_devices.response["userInfo"]
+            user_info = self.api.devices.user_info
         except (
             PyiCloudServiceNotActivatedException,
             PyiCloudNoDevicesException,
+            PyiCloudServiceUnavailable,
         ) as err:
             _LOGGER.error("No iCloud device found")
             raise ConfigEntryNotReady from err
 
-        self._owner_fullname = f"{user_info['firstName']} {user_info['lastName']}"
+        if user_info is None:
+            raise ConfigEntryNotReady("No user info found in iCloud devices response")
+
+        self._owner_fullname = (
+            f"{user_info.get('firstName')} {user_info.get('lastName')}"
+        )
 
         self._family_members_fullname = {}
         if user_info.get("membersInfo") is not None:
-            for prs_id, member in user_info["membersInfo"].items():
+            for prs_id, member in user_info.get("membersInfo").items():
                 self._family_members_fullname[prs_id] = (
                     f"{member['firstName']} {member['lastName']}"
                 )

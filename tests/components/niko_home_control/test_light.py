@@ -4,7 +4,7 @@ from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from syrupy import SnapshotAssertion
+from syrupy.assertion import SnapshotAssertion
 
 from homeassistant.components.light import ATTR_BRIGHTNESS, DOMAIN as LIGHT_DOMAIN
 from homeassistant.const import (
@@ -42,7 +42,7 @@ async def test_entities(
 @pytest.mark.parametrize(
     ("light_id", "data", "set_brightness"),
     [
-        (0, {ATTR_ENTITY_ID: "light.light"}, 255),
+        (0, {ATTR_ENTITY_ID: "light.light"}, None),
         (
             1,
             {ATTR_ENTITY_ID: "light.dimmable_light", ATTR_BRIGHTNESS: 50},
@@ -119,7 +119,7 @@ async def test_updating(
     assert hass.states.get("light.light").state == STATE_OFF
 
     assert hass.states.get("light.dimmable_light").state == STATE_ON
-    assert hass.states.get("light.dimmable_light").attributes[ATTR_BRIGHTNESS] == 255
+    assert hass.states.get("light.dimmable_light").attributes[ATTR_BRIGHTNESS] == 100
 
     dimmable_light.state = 204
     await find_update_callback(mock_niko_home_control_connection, 2)(204)

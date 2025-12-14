@@ -4,6 +4,7 @@ from collections.abc import Generator
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
+from bosch_alarm_mode2.const import PANEL_FAMILY, PanelModel
 from bosch_alarm_mode2.panel import Area, Door, Output, Point
 from bosch_alarm_mode2.utils import Observable
 import pytest
@@ -39,10 +40,10 @@ def model(request: pytest.FixtureRequest) -> Generator[str]:
 
 @pytest.fixture
 def extra_config_entry_data(
-    model: str, model_name: str, config_flow_data: dict[str, Any]
+    model: str, panel_model: PanelModel, config_flow_data: dict[str, Any]
 ) -> dict[str, Any]:
     """Return extra config entry data."""
-    return {CONF_MODEL: model_name} | config_flow_data
+    return {CONF_MODEL: panel_model.name} | config_flow_data
 
 
 @pytest.fixture(params=[None])
@@ -64,12 +65,12 @@ def config_flow_data(model: str) -> dict[str, Any]:
 
 
 @pytest.fixture
-def model_name(model: str) -> str | None:
+def panel_model(model: str) -> PanelModel | None:
     """Return extra config entry data."""
     return {
-        "solution_3000": "Solution 3000",
-        "amax_3000": "AMAX 3000",
-        "b5512": "B5512 (US1B)",
+        "solution_3000": PanelModel("Solution 3000", PANEL_FAMILY.SOLUTION),
+        "amax_3000": PanelModel("AMAX 3000", PANEL_FAMILY.AMAX),
+        "b5512": PanelModel("B5512 (US1B)", PANEL_FAMILY.BG_SERIES),
     }.get(model)
 
 
@@ -166,7 +167,7 @@ def mock_panel(
     door: AsyncMock,
     output: AsyncMock,
     points: dict[int, AsyncMock],
-    model_name: str,
+    panel_model: str,
     serial_number: str | None,
 ) -> Generator[AsyncMock]:
     """Define a fixture to set up Bosch Alarm."""
@@ -181,7 +182,7 @@ def mock_panel(
         client.doors = {1: door}
         client.outputs = {1: output}
         client.points = points
-        client.model = model_name
+        client.model = panel_model
         client.faults = []
         client.events = []
         client.panel_faults_ids = []
@@ -201,15 +202,16 @@ def mock_config_entry(
     mac_address: str | None,
 ) -> MockConfigEntry:
     """Mock config entry for bosch alarm."""
+    data = {
+        CONF_HOST: "0.0.0.0",
+        CONF_PORT: 7700,
+        CONF_MODEL: "bosch_alarm_test_data.model",
+    }
+    if mac_address:
+        data[CONF_MAC] = format_mac(mac_address)
     return MockConfigEntry(
         domain=DOMAIN,
         unique_id=serial_number,
         entry_id="01JQ917ACKQ33HHM7YCFXYZX51",
-        data={
-            CONF_HOST: "0.0.0.0",
-            CONF_PORT: 7700,
-            CONF_MODEL: "bosch_alarm_test_data.model",
-            CONF_MAC: mac_address and format_mac(mac_address),
-        }
-        | extra_config_entry_data,
+        data=data | extra_config_entry_data,
     )
