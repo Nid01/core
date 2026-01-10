@@ -6,5 +6,5 @@
   "documentation": "https://www.home-assistant.io/integrations/ecoflow_iot_open",
   "iot_class": "cloud_push",
   "quality_scale": "bronze",
-  "requirements": ["aiomqtt==2.3.2", "reactivex==4.0.4"]
+  "requirements": ["aiomqtt==2.5.0", "reactivex==4.0.4"]
 }
