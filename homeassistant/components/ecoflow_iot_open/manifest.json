@@ -4,6 +4,7 @@
   "codeowners": ["@Nid01"],
   "config_flow": true,
   "documentation": "https://www.home-assistant.io/integrations/ecoflow_iot_open",
+  "integration_type": "hub",
   "iot_class": "cloud_push",
   "quality_scale": "bronze",
   "requirements": ["aiomqtt==2.5.0", "reactivex==4.0.4"]
