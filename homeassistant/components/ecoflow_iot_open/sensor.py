@@ -33,7 +33,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceEntry
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval
-from homeassistant.util import dt as dt_util
+from homeassistant.util import dt as dt_util, slugify
 
 from .api import EcoFlowIoTOpenAPIInterface
 from .const import API_CLIENT, DOMAIN, PRODUCTS
@@ -80,10 +80,9 @@ class BaseSensorEntity(SensorEntity, EcoFlowBaseEntity):
     ) -> None:
         """Initialize."""
         super().__init__(api, device, mqtt_key, title, enabled, auto_enable)
-        if title != "":
-            self.entity_id = f"{SENSOR_DOMAIN}.{device.device_name.replace(' ', '_').replace('-', '_').replace('.', '_')}_{title}"
-        else:
-            self.entity_id = f"{SENSOR_DOMAIN}.{device.device_name.replace(' ', '_').replace('-', '_').replace('.', '_')}_{mqtt_key}"
+        self.entity_id = (
+            f"{SENSOR_DOMAIN}.{slugify(f'{device.device_name}_{mqtt_key or mqtt_key}')}"
+        )
 
         # self.entity_description = description
 
@@ -97,7 +96,7 @@ class BaseSensorEntity(SensorEntity, EcoFlowBaseEntity):
             "kit.productInfoDetails",
             "iot.switchState",
         ):
-            unique_id = f"{device.serial_number}_{mqtt_key}_{title.replace(' ', '_').replace('-', '_').replace('.', '_')}"
+            unique_id = f"{device.serial_number}_{mqtt_key}_{slugify(title)}"
         else:
             unique_id = f"{device.serial_number}_{mqtt_key}"
         self._attr_unique_id = unique_id
@@ -699,7 +698,7 @@ class TemperateSensorEntity(BaseSensorEntity):
         if self._list_position is not None:
             try:
                 value = val[self._list_position]
-            except (IndexError, TypeError, ValueError):
+            except IndexError, TypeError, ValueError:
                 return False
         else:
             value = val
@@ -761,7 +760,7 @@ class VoltageSensorEntity(BaseSensorEntity):
         if self._list_position is not None:
             try:
                 value = int(val[self._list_position]) / 1000
-            except (IndexError, TypeError, ValueError):
+            except IndexError, TypeError, ValueError:
                 return False
         else:
             value = int(val) / 1000

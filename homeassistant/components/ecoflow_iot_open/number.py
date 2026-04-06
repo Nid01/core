@@ -16,6 +16,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import DEGREE, LIGHT_LUX, PERCENTAGE, UnitOfPower
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.util import slugify
 
 from .api import EcoFlowIoTOpenAPIInterface
 from .const import API_CLIENT, DOMAIN, PRODUCTS
@@ -71,7 +72,9 @@ class BaseNumberEntity(NumberEntity, EcoFlowBaseCommandEntity):
         self._attr_native_max_value = max_value
         self._attr_native_min_value = min_value
         self._attr_native_step = step
-        self.entity_id = f"{NUMBER_DOMAIN}.{device.device_name.replace(' ', '_').replace('-', '_').replace('.', '_')}_{mqtt_key}"
+        self.entity_id = (
+            f"{NUMBER_DOMAIN}.{slugify(f'{device.device_name}_{mqtt_key}')}"
+        )
 
     def _update_value(self, val: Any) -> bool:
         if self._attr_native_value != val:

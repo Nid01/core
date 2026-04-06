@@ -10,6 +10,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.util import slugify
 
 from .api import EcoFlowIoTOpenAPIInterface
 from .const import API_CLIENT, DOMAIN, PRODUCTS, ProductType
@@ -63,10 +64,12 @@ class BaseSelectEntity(SelectEntity, EcoFlowBaseCommandEntity):
     ) -> None:
         """Initialize."""
         super().__init__(api, device, mqtt_key, command, title, enabled, auto_enable)
-        self.entity_id = f"{SELECT_DOMAIN}.{device.device_name.replace(' ', '_').replace('-', '_').replace('.', '_')}_{mqtt_key}"
+        self.entity_id = (
+            f"{SELECT_DOMAIN}.{slugify(f'{device.device_name}_{mqtt_key}')}"
+        )
 
-        if mqtt_key in ("iot.switchState",):
-            unique_id = f"{device.serial_number}_{mqtt_key}_{title.replace(' ', '_').replace('-', '_').replace('.', '_')}"
+        if mqtt_key == "iot.switchState":
+            unique_id = f"{device.serial_number}_{mqtt_key}_{slugify(title)}"
         else:
             unique_id = f"{device.serial_number}_{mqtt_key}"
         self._attr_unique_id = unique_id

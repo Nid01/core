@@ -7,6 +7,7 @@ from homeassistant.components.switch import DOMAIN as SWITCH_DOMAIN, SwitchEntit
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.util import slugify
 
 from .api import EcoFlowIoTOpenAPIInterface
 from .const import API_CLIENT, DOMAIN, PRODUCTS, ProductType
@@ -54,13 +55,12 @@ class BaseSwitchEntity(SwitchEntity, EcoFlowBaseCommandEntity):
     ) -> None:
         """Initialize."""
         super().__init__(api, device, mqtt_key, command, title, enabled, auto_enable)
-        if title != "":
-            self.entity_id = f"{SWITCH_DOMAIN}.{device.device_name.replace(' ', '_').replace('-', '_').replace('.', '_')}_{title}"
-        else:
-            self.entity_id = f"{SWITCH_DOMAIN}.{device.device_name.replace(' ', '_').replace('-', '_').replace('.', '_')}_{mqtt_key}"
+        self.entity_id = (
+            f"{SWITCH_DOMAIN}.{slugify(f'{device.device_name}_{mqtt_key or mqtt_key}')}"
+        )
 
         if mqtt_key in ("iot.switchState", "iot.word"):
-            unique_id = f"{device.serial_number}_{mqtt_key}_{title.replace(' ', '_').replace('-', '_').replace('.', '_')}"
+            unique_id = f"{device.serial_number}_{mqtt_key}_{slugify(title)}"
         else:
             unique_id = f"{device.serial_number}_{mqtt_key}"
         self._attr_unique_id = unique_id

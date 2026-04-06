@@ -12,6 +12,7 @@ from propcache.api import cached_property
 from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
+from homeassistant.util import slugify
 
 from .api import EcoFlowIoTOpenAPIInterface
 from .const import DOMAIN, ECOFLOW, MODELS, ProductType
@@ -55,8 +56,7 @@ class EcoFlowBaseEntity(Entity):
         # f"{device.device_name}_{mqtt_key}"
         # self._attr_unique_id = f"{device.serial_number}_{device.device_name}"
         # self._attr_unique_id = self.gen_unique_id(device.serial_number, mqtt_key)
-        unique_id = f"{device.serial_number}_{mqtt_key}"
-        self._attr_unique_id = unique_id
+        self._attr_unique_id = slugify(f"{device.serial_number}_{mqtt_key}")
         self._auto_enable = auto_enable
         self._device = device
         self._mqtt_key = mqtt_key
@@ -179,7 +179,7 @@ class EcoFlowBaseCommandEntity(EcoFlowBaseEntity):
             MODELS[ProductType.DELTA_MAX],
             MODELS[ProductType.SINGLE_AXIS_SOLAR_TRACKER],
         ):
-            if model in (MODELS[ProductType.SINGLE_AXIS_SOLAR_TRACKER],):
+            if model == MODELS[ProductType.SINGLE_AXIS_SOLAR_TRACKER]:
                 protobuf_message = await self._device.prepare_protobuf_message(command)
                 if protobuf_message is not None:
                     await self._api.publish_app(self.serial_number, protobuf_message)

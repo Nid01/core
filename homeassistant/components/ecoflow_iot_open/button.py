@@ -7,6 +7,7 @@ from homeassistant.components.button import DOMAIN as BUTTON_DOMAIN, ButtonEntit
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.util import slugify
 
 from .api import EcoFlowIoTOpenAPIInterface
 from .const import API_CLIENT, DOMAIN, PRODUCTS, ProductType
@@ -53,7 +54,7 @@ class BaseButtonEntity(ButtonEntity, EcoFlowBaseCommandEntity):
     ) -> None:
         """Initialize."""
         super().__init__(api, device, "", command, title, enabled, auto_enable)
-        self.entity_id = f"{BUTTON_DOMAIN}.{device.device_name.replace(' ', '_').replace('-', '_').replace('.', '_')}_{title}"
+        self.entity_id = f"{BUTTON_DOMAIN}.{slugify(f'{device.device_name}_{title}')}"
         self._attr_unique_id = f"{device.serial_number}_{title}"
 
     async def async_press(self) -> None:
