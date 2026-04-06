@@ -9,7 +9,7 @@ from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import UnitOfElectricCurrent, UnitOfTime
 
 from ..api import EcoFlowIoTOpenAPIInterface
-from ..number import BaseNumberEntity, BatteryNumberEntity
+from ..number import BatteryNumberEntity, ValueUpdateNumberEntity
 from ..select import BaseSelectEntity, SelectEntity
 from ..sensor import (
     BatterySensorEntity,
@@ -70,7 +70,7 @@ class DELTAMax(BaseDevice):
                 min_value=50,
                 max_value=100,
             ),
-            BaseNumberEntity(
+            ValueUpdateNumberEntity(
                 api,
                 self,
                 "inv.cfgSlowChgWatts",
