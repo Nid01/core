@@ -433,25 +433,33 @@ class EcoFlowIoTOpenAPIInterface:
     async def _handle_mqtt_message(self, message: Message):
         """Handle incoming MQTT messages."""
 
-        if not isinstance(message.payload, (bytes, bytearray)):
-            raise TypeError(
-                f"Expected payload type bytes or bytesarray, but received: {type(message.payload)}"
-            )
-        unpacked_json = json.loads(message.payload.decode("utf-8"))
-        _LOGGER.debug("MQTT message from topic: %s", message.topic)
-        _LOGGER.debug(json.dumps(unpacked_json, indent=2, sort_keys=True))
-
         serial_number = message.topic.value.split("/")[
             4 if message.topic.value.startswith("/app/") else 3
         ]
         product_type = BaseDevice.get_product_type_from_serial_number(serial_number)
 
+        if product_type == ProductType.SINGLE_AXIS_SOLAR_TRACKER:
+            _LOGGER.info(message.payload.hex())
+            unpacked_json: dict[str, Any] = {"params": {}}
+            unpacked_json["params"] = await self._products[product_type][
+                serial_number
+            ].process_protobuf_message(message.payload)
+        else:
+            unpacked_json = json.loads(message.payload.decode("utf-8"))
+
+        _LOGGER.debug("MQTT message from topic: %s", message.topic)
+        _LOGGER.debug(json.dumps(unpacked_json, indent=2, sort_keys=True))
+
         if product_type != ProductType.UNKNOWN:
             if "param" in unpacked_json:
                 unpacked_json["params"] = unpacked_json.pop("param")
+            if product_type == ProductType.SINGLE_AXIS_SOLAR_TRACKER:
+                unpacked_json["params"] = {
+                    f"iot.{key}": value
+                    for key, value in unpacked_json["params"].items()
+                }
             if "addr" in unpacked_json and product_type in (
                 ProductType.POWERSTREAM,
-                ProductType.SINGLE_AXIS_SOLAR_TRACKER,
                 ProductType.SMART_PLUG,
             ):
                 addr = unpacked_json["addr"]

@@ -2,7 +2,11 @@
 
 from collections.abc import Sequence
 from datetime import datetime
+import logging
 from typing import Any
+
+from google.protobuf.json_format import MessageToDict
+from google.protobuf.message import DecodeError
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.components.number import NumberEntity
@@ -43,8 +47,10 @@ from ..switch import (
 )
 from . import (
     BaseDevice,
-    single_axis_solar_tracker_pb2,  # https://developers.home-assistant.io/docs/asyncio_blocking_operations/#import_module
+    single_axis_solar_tracker_pb2 as pb2,  # https://developers.home-assistant.io/docs/asyncio_blocking_operations/#import_module
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class SingleAxisSolarTracker(BaseDevice):
@@ -59,10 +65,10 @@ class SingleAxisSolarTracker(BaseDevice):
         """Prepare the protobuf message for the single axis solar tracker."""
         sequence = int(datetime.now().timestamp())
 
-        pdata = single_axis_solar_tracker_pb2.setValue(  # type: ignore[attr-defined]
+        pdata = pb2.setValue(  # type: ignore[attr-defined]
             value=command.get("value"), value2=command.get("value2")
         )
-        header = single_axis_solar_tracker_pb2.setHeader(  # type: ignore[attr-defined]
+        header = pb2.setHeader(  # type: ignore[attr-defined]
             pdata=pdata,
             src=32,
             dest=53,
@@ -80,8 +86,20 @@ class SingleAxisSolarTracker(BaseDevice):
             **{"from": "HomeAssistant"},
             device_sn=self.serial_number,
         )
-        message = single_axis_solar_tracker_pb2.setMessage(header=header)  # type: ignore[attr-defined]
+        message = pb2.setMessage(header=header)  # type: ignore[attr-defined]
         return message.SerializeToString()
+
+    async def process_protobuf_message(self, payload: bytes | bytearray):
+        """Process the protobuf message for the single axis solar tracker."""
+        pb2_message = pb2.getMessage()  # type: ignore[attr-defined]
+        try:
+            pb2_message.ParseFromString(payload)
+            _LOGGER.info("Parsed pb2_message: %s", pb2_message)
+
+            return MessageToDict(pb2_message.data.params)
+
+        except DecodeError as e:
+            _LOGGER.error("Failed to parse pb2_message: %s", e)
 
     def buttons(self, api: EcoFlowIoTOpenAPIInterface) -> Sequence[ButtonEntity]:
         """Available buttons for Single Axis Solar Tracker."""
