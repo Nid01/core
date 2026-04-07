@@ -94,7 +94,7 @@ class SingleAxisSolarTracker(BaseDevice):
         pb2_message = pb2.getMessage()  # type: ignore[attr-defined]
         try:
             pb2_message.ParseFromString(payload)
-            _LOGGER.info("Parsed pb2_message: %s", pb2_message)
+            _LOGGER.debug("Parsed pb2_message: %s", pb2_message)
 
             return MessageToDict(pb2_message.data.params)
 
@@ -245,6 +245,7 @@ class SingleAxisSolarTracker(BaseDevice):
             ChargingStateSensorEntity(api, self, "iot.chargeState"),
             *angle_sensors,
             *diagnostic_sensors,
+            DiagnosticSensorEntity(api, self, "iot.pbdata_hex", enabled=False),
             DurationSensorEntity(api, self, "iot.chargeTimer", UnitOfTime.SECONDS),
             IlluminanceSensorEntity(api, self, "iot.lux"),
             IlluminanceGradeSensorEntity(api, self, "iot.luxGrade"),

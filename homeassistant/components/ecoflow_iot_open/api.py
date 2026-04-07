@@ -439,11 +439,16 @@ class EcoFlowIoTOpenAPIInterface:
         product_type = BaseDevice.get_product_type_from_serial_number(serial_number)
 
         if product_type == ProductType.SINGLE_AXIS_SOLAR_TRACKER:
-            _LOGGER.info(message.payload.hex())
+            _LOGGER.debug(
+                "Serial number: %s, Payload hex: %s",
+                serial_number,
+                message.payload.hex(),
+            )
             unpacked_json: dict[str, Any] = {"params": {}}
             unpacked_json["params"] = await self._products[product_type][
                 serial_number
             ].process_protobuf_message(message.payload)
+            unpacked_json["params"]["pbdata_hex"] = message.payload.hex()
         else:
             unpacked_json = json.loads(message.payload.decode("utf-8"))
 
