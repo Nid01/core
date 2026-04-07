@@ -137,10 +137,10 @@ class EcoFlowIoTOpenAPIInterface:
     ) -> BaseDevice:
         """Create an instance of the product based on its type."""
         # pylint: disable=import-outside-toplevel
-        from .products.delta_max import DELTAMax
-        from .products.powerstream import PowerStream
-        from .products.single_axis_solar_tracker import SingleAxisSolarTracker
-        from .products.smart_plug import SmartPlug
+        from .products.delta_max import DELTAMax  # noqa: I001, PLC0415
+        from .products.powerstream import PowerStream  # noqa: PLC0415
+        from .products.single_axis_solar_tracker import SingleAxisSolarTracker  # noqa: PLC0415
+        from .products.smart_plug import SmartPlug  # noqa: PLC0415
 
         if product_type == ProductType.DELTA_MAX:
             return DELTAMax(device, self)
@@ -354,8 +354,14 @@ class EcoFlowIoTOpenAPIInterface:
         await self._subscribe_mqtt(
             client_cert=self._open_certification,
             topic_fn=topic_fn,
-            enabled_filter=lambda device: device.disabled_by is None
-            and device.model != MODELS[ProductType.DELTA_MAX],
+            enabled_filter=lambda device: (
+                device.disabled_by is None
+                and device.model
+                not in (
+                    MODELS[ProductType.DELTA_MAX],
+                    MODELS[ProductType.SINGLE_AXIS_SOLAR_TRACKER],
+                )
+            ),
             api_variant="open",
         )
 
@@ -371,8 +377,14 @@ class EcoFlowIoTOpenAPIInterface:
         await self._subscribe_mqtt(
             client_cert=self._app_mqtt_certification,
             topic_fn=topic_fn,
-            enabled_filter=lambda device: device.disabled_by is None
-            and device.model == MODELS[ProductType.DELTA_MAX],
+            enabled_filter=lambda device: (
+                device.disabled_by is None
+                and device.model
+                in (
+                    MODELS[ProductType.DELTA_MAX],
+                    MODELS[ProductType.SINGLE_AXIS_SOLAR_TRACKER],
+                )
+            ),
             api_variant="app",
         )
 
