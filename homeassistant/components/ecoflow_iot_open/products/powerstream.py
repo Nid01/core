@@ -118,6 +118,11 @@ class PowerStream(BaseDevice):
 
         device_info_keys = self.discard_unnecessary_keys(set(self._device_info.keys()))
 
+        current_factors = {
+            "iot.pv1InputCur": 0.1,
+            "iot.pv2InputCur": 0.1,
+        }
+
         current_keys = [
             "iot.batInputCur",
             "iot.bmsReqChgAmp",
@@ -127,7 +132,8 @@ class PowerStream(BaseDevice):
         ]
 
         current_sensors = [
-            CurrentSensorEntity(api, self, key)
+            CurrentSensorEntity(api, self, key,
+                current_factors.get(key, 0.001),)
             for key in current_keys
             if key in device_info_keys
         ]
