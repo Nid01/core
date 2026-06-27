@@ -132,8 +132,12 @@ class PowerStream(BaseDevice):
         ]
 
         current_sensors = [
-            CurrentSensorEntity(api, self, key,
-                current_factors.get(key, 0.001),)
+            CurrentSensorEntity(
+                api,
+                self,
+                key,
+                current_factors.get(key, 0.001),
+            )
             for key in current_keys
             if key in device_info_keys
         ]
