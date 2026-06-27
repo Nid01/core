@@ -249,7 +249,7 @@ class DELTAMax(BaseDevice):
                 api,
                 self,
                 key,
-                current_units.get(key, UnitOfElectricCurrent.AMPERE),
+                unit=current_units.get(key, UnitOfElectricCurrent.AMPERE),
             ),
         )
 
