@@ -218,20 +218,22 @@ class CurrentSensorEntity(BaseSensorEntity):
         self,
         api: EcoFlowIoTOpenAPIInterface,
         device,
-        key: str,
+        mqtt_key: str,
+        factor: float = 0.001,
         unit=UnitOfElectricCurrent.AMPERE,
     ) -> None:
         """Initialize with unit for ampere and default to ampere."""
         self._api = api
         self.device = device
-        self.key = key
+        self.key = mqtt_key
         self._attr_native_unit_of_measurement = unit
-        super().__init__(api, device, key)
+        self._factor = factor
+        super().__init__(api, device, mqtt_key)
 
     def _update_value(self, val: Any) -> bool:
         if self._attr_native_unit_of_measurement == UnitOfElectricCurrent.MILLIAMPERE:
             return super()._update_value(int(val))
-        return super()._update_value(int(val) / 1000)
+        return super()._update_value(int(val) * self._factor)
 
 
 # TODO Merge CountSensorEntity and CyclesSensorEntity # pylint: disable=fixme
