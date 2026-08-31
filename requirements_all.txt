@@ -2817,7 +2817,7 @@ rapt-ble==0.1.2
 raspyrfm-client==1.2.9
 
 # homeassistant.components.ecoflow_iot_open
-reactivex==4.0.4
+reactivex==4.1.0
 
 # homeassistant.components.redgtech
 redgtech-api==0.1.38
