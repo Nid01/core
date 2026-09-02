@@ -262,32 +262,6 @@ class DELTAMax(BaseDevice):
             cycles_keys, lambda key: CyclesSensorEntity(api, self, key)
         )
 
-        energy_keys = [
-            "pd.chgPowerAc",
-            "pd.chgPowerDc",
-            "pd.chgSunPower",
-            "pd.dsgPowerAc",
-            "pd.dsgPowerDc",
-        ]
-
-        energy_sensors = self.make_sensors(
-            energy_keys, lambda key: EnergySensorEntity(api, self, key)
-        )
-
-        energy_storage_keys = [
-            "bmsMaster.designCap",
-            "bmsMaster.fullCap",
-            "bmsMaster.remainCap",
-            "bmsSlave1.designCap",
-            "bmsSlave1.fullCap",
-            "bmsSlave1.remainCap",
-        ]
-
-        energy_storage_sensors = self.make_sensors(
-            energy_storage_keys,
-            lambda key: EnergyStorageSensorEntity(api, self, key),
-        )
-
         duration_keys = [
             "bmsMaster.remainTime",
             "bmsSlave1.remainTime",
@@ -312,6 +286,32 @@ class DELTAMax(BaseDevice):
             lambda key: DurationSensorEntity(
                 api, self, key, duration_units.get(key, UnitOfTime.MINUTES)
             ),
+        )
+
+        energy_keys = [
+            "pd.chgPowerAc",
+            "pd.chgPowerDc",
+            "pd.chgSunPower",
+            "pd.dsgPowerAc",
+            "pd.dsgPowerDc",
+        ]
+
+        energy_sensors = self.make_sensors(
+            energy_keys, lambda key: EnergySensorEntity(api, self, key)
+        )
+
+        energy_storage_keys = [
+            "bmsMaster.designCap",
+            "bmsMaster.fullCap",
+            "bmsMaster.remainCap",
+            "bmsSlave1.designCap",
+            "bmsSlave1.fullCap",
+            "bmsSlave1.remainCap",
+        ]
+
+        energy_storage_sensors = self.make_sensors(
+            energy_storage_keys,
+            lambda key: EnergyStorageSensorEntity(api, self, key),
         )
 
         power_keys = [

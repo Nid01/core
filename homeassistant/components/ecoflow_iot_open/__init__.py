@@ -62,7 +62,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
             config_entry.entry_id,
         )
         await api.certification()
-    except (InvalidCredentialsError, KeyError):
+    except InvalidCredentialsError, KeyError:
         _LOGGER.exception("Invalid credentials provided")
         return False
     except EcoFlowIoTOpenError as err:
@@ -72,6 +72,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         products = await api.get_devices_by_product(
             [
                 ProductType.DELTA_MAX,
+                ProductType.DELTA_2_MAX,
                 ProductType.POWERSTREAM,
                 ProductType.SINGLE_AXIS_SOLAR_TRACKER,
                 ProductType.SMART_PLUG,

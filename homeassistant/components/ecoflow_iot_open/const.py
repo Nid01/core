@@ -43,6 +43,7 @@ class ProductType(Enum):
     RIVER_PRO = 7
     DELTA_MAX = 8  # productType = 13
     DELTA_2_MAX = 9  # productType = 81
+    # DELTA_2_MAX_BATTERY = 16  # productType = 81
     DELTA_MINI = 15  # productType = 15
     SINGLE_AXIS_SOLAR_TRACKER = 31
     WAVE_2 = 45  # productType = 45
@@ -55,8 +56,11 @@ class ProductType(Enum):
 
 SERIAL_NUMBER_PREFIXES = {
     ProductType.DELTA_MAX: "DAEB",  # productType = 13
-    # Potentially setup DELTA_MAX_SMART_EXTRA_BATTERY as separate device?
+    ProductType.DELTA_2_MAX: "R351",
+    # ProductType.DELTA_2_MAX_BATTERY: "R361",
+    # Potentially setup DELTA_2_MAX_BATTERY as separate device?
     # ProductType.DELTA_MAX_SMART_EXTRA_BATTERY: "E2AB"  # productType=13
+    # Potentially setup DELTA_MAX_SMART_EXTRA_BATTERY as separate device?
     ProductType.POWERSTREAM: "HW51",  # productType=75
     ProductType.SMART_PLUG: "HW52",
     ProductType.SINGLE_AXIS_SOLAR_TRACKER: "HZ31",
@@ -64,6 +68,8 @@ SERIAL_NUMBER_PREFIXES = {
 }
 MODELS = {
     ProductType.DELTA_MAX: "DELTA Max",
+    ProductType.DELTA_2_MAX: "DELTA 2 Max",
+    # ProductType.DELTA_2_MAX_BATTERY: "DELTA 2 Max Battery",
     ProductType.POWERSTREAM: "PowerStream",
     ProductType.SMART_PLUG: "Smart Plug",
     ProductType.SINGLE_AXIS_SOLAR_TRACKER: "Single Axis Solar Tracker",

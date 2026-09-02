@@ -138,12 +138,15 @@ class EcoFlowIoTOpenAPIInterface:
         """Create an instance of the product based on its type."""
         # pylint: disable=import-outside-toplevel
         from .products.delta_max import DELTAMax  # noqa: I001, PLC0415
+        from .products.delta_2_max import DELTA2Max  # noqa: PLC0415
         from .products.powerstream import PowerStream  # noqa: PLC0415
         from .products.single_axis_solar_tracker import SingleAxisSolarTracker  # noqa: PLC0415
         from .products.smart_plug import SmartPlug  # noqa: PLC0415
 
         if product_type == ProductType.DELTA_MAX:
             return DELTAMax(device, self)
+        if product_type == ProductType.DELTA_2_MAX:
+            return DELTA2Max(device, self)
         if product_type == ProductType.SINGLE_AXIS_SOLAR_TRACKER:
             return SingleAxisSolarTracker(device, self)
         if product_type == ProductType.POWERSTREAM:
@@ -461,6 +464,28 @@ class EcoFlowIoTOpenAPIInterface:
             if product_type == ProductType.SINGLE_AXIS_SOLAR_TRACKER:
                 unpacked_json["params"] = {
                     f"iot.{key}": value
+                    for key, value in unpacked_json["params"].items()
+                }
+            if (
+                product_type == ProductType.DELTA_2_MAX
+                and unpacked_json.get("typeCode", "") != ""
+            ):
+                typeCode = unpacked_json["typeCode"]
+                if typeCode == "pdStatus":
+                    typeCode = "pd"
+                if typeCode in ("bmsInfo", "bmsStatus", "emsStatus"):
+                    typeCode = "bms_" + typeCode
+                if typeCode in ("bmsStatus", "bms_bmsInfo"):
+                    typeCode = "bms_" + typeCode
+                if typeCode in ("bmsSlaveStatus_1", "bmsSlaveInfo_1"):
+                    typeCode = "bms_slave_" + typeCode
+                if typeCode in ("invStatus"):
+                    typeCode = "inv"
+                if typeCode in ("mpptStatus"):
+                    typeCode = "mppt"
+
+                unpacked_json["params"] = {
+                    f"{typeCode}.{key}": value
                     for key, value in unpacked_json["params"].items()
                 }
             if "addr" in unpacked_json and product_type in (

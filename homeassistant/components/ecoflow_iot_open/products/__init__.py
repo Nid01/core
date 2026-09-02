@@ -94,6 +94,8 @@ class BaseDevice(ABC):
         serial_number_prefix = value[:4]
         if serial_number_prefix == SERIAL_NUMBER_PREFIXES[ProductType.DELTA_MAX]:
             return ProductType.DELTA_MAX
+        if serial_number_prefix == SERIAL_NUMBER_PREFIXES[ProductType.DELTA_2_MAX]:
+            return ProductType.DELTA_2_MAX
         if (
             serial_number_prefix
             == SERIAL_NUMBER_PREFIXES[ProductType.SINGLE_AXIS_SOLAR_TRACKER]
