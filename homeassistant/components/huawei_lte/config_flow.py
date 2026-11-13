@@ -1,10 +1,8 @@
 """Config flow for the Huawei LTE platform."""
 
-from __future__ import annotations
-
 from collections.abc import Mapping
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 from urllib.parse import urlparse
 
 from huawei_lte_api.Client import Client
@@ -71,6 +69,7 @@ class HuaweiLteConfigFlow(ConfigFlow, domain=DOMAIN):
 
     @staticmethod
     @callback
+    @override
     def async_get_options_flow(
         config_entry: HuaweiLteConfigEntry,
     ) -> HuaweiLteOptionsFlow:
@@ -196,6 +195,7 @@ class HuaweiLteConfigFlow(ConfigFlow, domain=DOMAIN):
         except Exception:
             _LOGGER.exception("Disconnect error")
 
+    @override
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -248,6 +248,7 @@ class HuaweiLteConfigFlow(ConfigFlow, domain=DOMAIN):
         info, wlan_settings = await self.hass.async_add_executor_job(
             get_device_info, conn
         )
+        # pylint: disable-next=home-assistant-sequential-executor-jobs
         await self.hass.async_add_executor_job(self._disconnect, conn)
 
         user_input.update(
@@ -274,6 +275,7 @@ class HuaweiLteConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_create_entry(title=title, data=user_input)
 
+    @override
     async def async_step_ssdp(
         self, discovery_info: SsdpServiceInfo
     ) -> ConfigFlowResult:
@@ -369,7 +371,8 @@ class HuaweiLteOptionsFlow(OptionsFlow):
     ) -> ConfigFlowResult:
         """Handle options flow."""
 
-        # Recipients are persisted as a list, but handled as comma separated string in UI
+        # Recipients are persisted as a list, but handled as comma
+        # separated string in UI
 
         if user_input is not None:
             # Preserve existing options, for example *_from_yaml markers
@@ -382,6 +385,8 @@ class HuaweiLteOptionsFlow(OptionsFlow):
 
         data_schema = vol.Schema(
             {
+                # Name field is no longer allowed in config flow schemas
+                # pylint: disable-next=home-assistant-config-flow-name-field
                 vol.Optional(
                     CONF_NAME,
                     default=self.config_entry.options.get(

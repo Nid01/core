@@ -9,6 +9,7 @@ import requests
 from requests.exceptions import ConnectTimeout, SSLError
 
 from homeassistant.components.proxmoxve.const import (
+    AUTH_OTHER,
     AUTH_PAM,
     CONF_AUTH_METHOD,
     CONF_CONTAINERS,
@@ -42,10 +43,10 @@ from . import setup_integration
 from tests.common import MockConfigEntry, async_load_json_array_fixture
 
 
+@pytest.mark.usefixtures("mock_setup_entry")
 async def test_config_import(
     hass: HomeAssistant,
     mock_proxmox_client: MagicMock,
-    mock_setup_entry: MagicMock,
     issue_registry: ir.IssueRegistry,
 ) -> None:
     """Test sensor initialization."""
@@ -162,28 +163,59 @@ async def test_setup_exceptions(
     attr_to_mock.side_effect = exception
 
     await setup_integration(hass, mock_config_entry)
-    assert mock_config_entry.state == expected_state
+    assert mock_config_entry.state is expected_state
 
 
+@pytest.mark.parametrize(
+    ("mock_config_entry", "expected_auth_method", "expected_realm"),
+    [
+        (
+            MockConfigEntry(
+                domain=DOMAIN,
+                version=1,
+                unique_id="1",
+                data={
+                    CONF_HOST: "http://test_host",
+                    CONF_PORT: 8006,
+                    CONF_REALM: "pam",
+                    CONF_USERNAME: "test_user@pam",
+                    CONF_PASSWORD: "test_password",
+                    CONF_VERIFY_SSL: True,
+                },
+            ),
+            AUTH_PAM,
+            "pam",
+        ),
+        (
+            MockConfigEntry(
+                domain=DOMAIN,
+                version=1,
+                unique_id="1",
+                data={
+                    CONF_HOST: "http://test_host",
+                    CONF_PORT: 8006,
+                    CONF_REALM: "Test_Realm",
+                    CONF_USERNAME: "test_user@Test_Realm",
+                    CONF_PASSWORD: "test_password",
+                    CONF_VERIFY_SSL: True,
+                },
+            ),
+            AUTH_OTHER,
+            "Test_Realm",
+        ),
+    ],
+)
 async def test_migration_v1_to_v3(
     hass: HomeAssistant,
     entity_registry: er.EntityRegistry,
     device_registry: dr.DeviceRegistry,
+    mock_config_entry: MockConfigEntry,
+    expected_auth_method: str,
+    expected_realm: str,
 ) -> None:
-    """Test migration from version 1."""
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        version=1,
-        unique_id="1",
-        data={
-            CONF_HOST: "http://test_host",
-            CONF_PORT: 8006,
-            CONF_REALM: "pam",
-            CONF_USERNAME: "test_user@pam",
-            CONF_PASSWORD: "test_password",
-            CONF_VERIFY_SSL: True,
-        },
-    )
+    """Test migration from version 1 to 3."""
+    entry = mock_config_entry
+
     entry.add_to_hass(hass)
     assert entry.version == 1
 
@@ -227,12 +259,105 @@ async def test_migration_v1_to_v3(
     await hass.async_block_till_done()
 
     assert entry.version == 3
+    assert entry.data[CONF_AUTH_METHOD] == expected_auth_method
+    assert entry.data[CONF_REALM] == expected_realm
 
     vm_entity_after = entity_registry.async_get(vm_entity.entity_id)
     container_entity_after = entity_registry.async_get(container_entity.entity_id)
 
     assert vm_entity_after.unique_id == f"{entry.entry_id}_100_status"
     assert container_entity_after.unique_id == f"{entry.entry_id}_200_status"
+
+
+@pytest.mark.parametrize(
+    ("mock_config_entry", "expected_auth_method", "expected_realm"),
+    [
+        (
+            MockConfigEntry(
+                domain=DOMAIN,
+                version=2,
+                unique_id="1",
+                data={
+                    CONF_HOST: "http://test_host",
+                    CONF_PORT: 8006,
+                    CONF_REALM: "pam",
+                    CONF_USERNAME: "test_user@pam",
+                    CONF_PASSWORD: "test_password",
+                    CONF_VERIFY_SSL: True,
+                },
+            ),
+            AUTH_PAM,
+            "pam",
+        ),
+        (
+            MockConfigEntry(
+                domain=DOMAIN,
+                version=2,
+                unique_id="1",
+                data={
+                    CONF_HOST: "http://test_host",
+                    CONF_PORT: 8006,
+                    CONF_REALM: "Test_Realm",
+                    CONF_USERNAME: "test_user@Test_Realm",
+                    CONF_PASSWORD: "test_password",
+                    CONF_VERIFY_SSL: True,
+                },
+            ),
+            AUTH_OTHER,
+            "Test_Realm",
+        ),
+        (
+            MockConfigEntry(
+                domain=DOMAIN,
+                version=2,
+                unique_id="1",
+                data={
+                    CONF_HOST: "http://test_host",
+                    CONF_PORT: 8006,
+                    CONF_USERNAME: "test_user@pam",
+                    CONF_PASSWORD: "test_password",
+                    CONF_VERIFY_SSL: True,
+                },
+            ),
+            AUTH_PAM,
+            "pam",
+        ),
+        (
+            MockConfigEntry(
+                domain=DOMAIN,
+                version=2,
+                unique_id="1",
+                data={
+                    CONF_HOST: "http://test_host",
+                    CONF_PORT: 8006,
+                    CONF_USERNAME: "test_user@Test_Realm",
+                    CONF_PASSWORD: "test_password",
+                    CONF_VERIFY_SSL: True,
+                },
+            ),
+            AUTH_OTHER,
+            "Test_Realm",
+        ),
+    ],
+)
+async def test_migration_v2_to_v3(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    expected_auth_method: str,
+    expected_realm: str,
+) -> None:
+    """Test migration from version 2 to 3."""
+    entry = mock_config_entry
+
+    entry.add_to_hass(hass)
+    assert entry.version == 2
+
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert entry.version == 3
+    assert entry.data[CONF_AUTH_METHOD] == expected_auth_method
+    assert entry.data[CONF_REALM] == expected_realm
 
 
 async def test_offline_node(
@@ -253,61 +378,6 @@ async def test_offline_node(
     assert state.state == STATE_OFF
 
 
-async def test_migration_v2_to_v3(
-    hass: HomeAssistant,
-) -> None:
-    """Test migration from version 2 to 3."""
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        version=2,
-        unique_id="1",
-        data={
-            CONF_HOST: "http://test_host",
-            CONF_PORT: 8006,
-            CONF_REALM: "pam",
-            CONF_USERNAME: "test_user@pam",
-            CONF_PASSWORD: "test_password",
-            CONF_VERIFY_SSL: True,
-        },
-    )
-    entry.add_to_hass(hass)
-    assert entry.version == 2
-
-    await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
-
-    assert entry.version == 3
-    assert entry.data[CONF_AUTH_METHOD] == AUTH_PAM
-    assert entry.data[CONF_REALM] == AUTH_PAM
-
-
-async def test_migration_v2_to_v3_without_realm(
-    hass: HomeAssistant,
-) -> None:
-    """Test migration from version 2 to 3."""
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        version=2,
-        unique_id="1",
-        data={
-            CONF_HOST: "http://test_host",
-            CONF_PORT: 8006,
-            CONF_USERNAME: "test_user@pam",
-            CONF_PASSWORD: "test_password",
-            CONF_VERIFY_SSL: True,
-        },
-    )
-    entry.add_to_hass(hass)
-    assert entry.version == 2
-
-    await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
-
-    assert entry.version == 3
-    assert entry.data[CONF_AUTH_METHOD] == AUTH_PAM
-    assert entry.data[CONF_REALM] == AUTH_PAM
-
-
 async def test_new_vm_creates_entity(
     hass: HomeAssistant,
     mock_proxmox_client: MagicMock,
@@ -317,7 +387,7 @@ async def test_new_vm_creates_entity(
     """Test that a VM appearing after initial load gets an entity created."""
     mock_proxmox_client._node_mock.qemu.get.return_value = []
     await setup_integration(hass, mock_config_entry)
-    assert mock_config_entry.state == ConfigEntryState.LOADED
+    assert mock_config_entry.state is ConfigEntryState.LOADED
 
     initial_count = len(
         er.async_entries_for_config_entry(entity_registry, mock_config_entry.entry_id)
@@ -350,7 +420,7 @@ async def test_new_container_creates_entity(
     """Test that a container appearing after initial load gets an entity created."""
     mock_proxmox_client._node_mock.lxc.get.return_value = []
     await setup_integration(hass, mock_config_entry)
-    assert mock_config_entry.state == ConfigEntryState.LOADED
+    assert mock_config_entry.state is ConfigEntryState.LOADED
 
     initial_count = len(
         er.async_entries_for_config_entry(entity_registry, mock_config_entry.entry_id)

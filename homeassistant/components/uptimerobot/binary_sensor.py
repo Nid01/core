@@ -1,6 +1,6 @@
 """UptimeRobot binary_sensor platform."""
 
-from __future__ import annotations
+from typing import override
 
 from pyuptimerobot import UptimeRobotMonitor
 
@@ -51,6 +51,7 @@ class UptimeRobotBinarySensor(UptimeRobotEntity, BinarySensorEntity):
     """Representation of a UptimeRobot binary sensor."""
 
     @property
+    @override
     def is_on(self) -> bool:
         """Return True if the entity is on."""
         return bool(self._monitor.status in STATUSES_ON)

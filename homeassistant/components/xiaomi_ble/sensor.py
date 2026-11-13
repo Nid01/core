@@ -1,8 +1,6 @@
 """Support for xiaomi ble sensors."""
 
-from __future__ import annotations
-
-from typing import cast
+from typing import cast, override
 
 from xiaomi_ble import DeviceClass, SensorUpdate, Units
 from xiaomi_ble.parser import ExtendedSensorDeviceClass
@@ -285,11 +283,13 @@ class XiaomiBluetoothSensorEntity(
     """Representation of a xiaomi ble sensor."""
 
     @property
+    @override
     def native_value(self) -> int | float | None:
         """Return the native value."""
         return self.processor.entity_data.get(self.entity_key)
 
     @property
+    @override
     def available(self) -> bool:
         """Return True if entity is available."""
         return self.processor.coordinator.sleepy_device or super().available

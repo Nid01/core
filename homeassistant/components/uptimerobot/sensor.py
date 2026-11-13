@@ -1,6 +1,6 @@
 """UptimeRobot sensor platform."""
 
-from __future__ import annotations
+from typing import override
 
 from pyuptimerobot import UptimeRobotMonitor
 
@@ -61,6 +61,7 @@ class UptimeRobotSensor(UptimeRobotEntity, SensorEntity):
     """Representation of a UptimeRobot sensor."""
 
     @property
+    @override
     def native_value(self) -> str | None:
         """Return the status of the monitor."""
         if not self._monitor.status:

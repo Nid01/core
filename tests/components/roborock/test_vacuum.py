@@ -1,5 +1,6 @@
 """Tests for Roborock vacuums."""
 
+from datetime import timedelta
 from typing import Any
 from unittest.mock import Mock, call
 
@@ -45,11 +46,12 @@ from homeassistant.helpers import (
     issue_registry as ir,
 )
 from homeassistant.setup import async_setup_component
+from homeassistant.util import dt as dt_util
 
 from .conftest import FakeDevice, set_trait_attributes
 from .mock_data import STATUS
 
-from tests.common import MockConfigEntry, snapshot_platform
+from tests.common import MockConfigEntry, async_fire_time_changed, snapshot_platform
 from tests.typing import WebSocketGenerator
 
 ENTITY_ID = "vacuum.roborock_s7_maxv"
@@ -322,7 +324,7 @@ async def test_get_current_position(
     snapshot: SnapshotAssertion,
     fake_vacuum: FakeDevice,
 ) -> None:
-    """Test that the service for getting the current position outputs the correct coordinates."""
+    """Test get current position outputs the correct coordinates."""
     fake_vacuum.v1_properties.map_content.map_data.vacuum_position = Point(x=123, y=456)
 
     response = await hass.services.async_call(
@@ -345,7 +347,7 @@ async def test_get_current_position_no_map_data(
     setup_entry: MockConfigEntry,
     fake_vacuum: FakeDevice,
 ) -> None:
-    """Test that the service for getting the current position handles no map data error."""
+    """Test get current position handles no map data error."""
     fake_vacuum.v1_properties.map_content.map_data = None
 
     with (
@@ -367,7 +369,7 @@ async def test_get_current_position_no_robot_position(
     setup_entry: MockConfigEntry,
     fake_vacuum: FakeDevice,
 ) -> None:
-    """Test that the service for getting the current position handles no robot position error."""
+    """Test get current position handles no robot position error."""
     fake_vacuum.v1_properties.map_content.map_data.vacuum_position = None
 
     with (
@@ -529,12 +531,13 @@ async def test_clean_segments_mixed_maps(
     entity_registry: er.EntityRegistry,
     vacuum_command: Mock,
 ) -> None:
-    """Test that clean_area service cleans only current-map segments when given segments from multiple maps."""
+    """Test clean_area only cleans current-map segments."""
     entity_registry.async_update_entity_options(
         ENTITY_ID,
         VACUUM_DOMAIN,
         {
-            # area_1 maps to segments from both maps; only map 1 (Downstairs) is current.
+            # area_1 maps to segments from both maps; only map 1
+            # (Downstairs) is current.
             "area_mapping": {"area_1": ["0_16", "1_17"]},
             "last_seen_segments": [
                 {"id": "0_16", "name": "Example room 1", "group": "Upstairs"},
@@ -550,7 +553,8 @@ async def test_clean_segments_mixed_maps(
         blocking=True,
     )
 
-    # Only the segment from the current map (map 1) is cleaned; segment from map 0 is ignored.
+    # Only the segment from the current map (map 1) is cleaned;
+    # segment from map 0 is ignored.
     assert vacuum_command.send.call_count == 1
     assert vacuum_command.send.call_args == call(
         RoborockCommand.APP_SEGMENT_CLEAN,
@@ -564,7 +568,7 @@ async def test_segments_changed_issue(
     entity_registry: er.EntityRegistry,
     fake_vacuum: FakeDevice,
 ) -> None:
-    """Test that a repair issue is created when segments change after area mapping is configured."""
+    """Test repair issue created when segments change after mapping."""
     entity_entry = entity_registry.async_get(ENTITY_ID)
     assert entity_entry is not None
     entity_registry.async_update_entity_options(
@@ -580,8 +584,7 @@ async def test_segments_changed_issue(
         },
     )
 
-    coordinator = setup_entry.runtime_data.v1[0]
-    await coordinator.async_refresh()
+    async_fire_time_changed(hass, dt_util.utcnow() + timedelta(minutes=10))
     await hass.async_block_till_done()
 
     issue_id = f"segments_changed_{entity_entry.id}"
@@ -589,6 +592,37 @@ async def test_segments_changed_issue(
     assert issue is not None
     assert issue.severity == ir.IssueSeverity.WARNING
     assert issue.translation_key == "segments_changed"
+
+
+async def test_segments_changed_issue_no_map_info(
+    hass: HomeAssistant,
+    setup_entry: MockConfigEntry,
+    entity_registry: er.EntityRegistry,
+    fake_vacuum: FakeDevice,
+) -> None:
+    """Test no repair issue is created when map info is not loaded/empty."""
+    entity_entry = entity_registry.async_get(ENTITY_ID)
+    assert entity_entry is not None
+    entity_registry.async_update_entity_options(
+        ENTITY_ID,
+        VACUUM_DOMAIN,
+        {
+            "last_seen_segments": [
+                {"id": "1_16", "name": "Example room 1", "group": "Downstairs"},
+                {"id": "1_99", "name": "Old room", "group": "Downstairs"},
+            ],
+        },
+    )
+
+    # Map info not loaded
+    fake_vacuum.v1_properties.home.home_map_info = None
+
+    async_fire_time_changed(hass, dt_util.utcnow() + timedelta(minutes=10))
+    await hass.async_block_till_done()
+
+    issue_id = f"segments_changed_{entity_entry.id}"
+    issue = ir.async_get(hass).async_get_issue(VACUUM_DOMAIN, issue_id)
+    assert issue is None
 
 
 @pytest.fixture(name="q7_vacuum_api", autouse=False)

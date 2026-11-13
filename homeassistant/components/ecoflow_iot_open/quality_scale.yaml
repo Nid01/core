@@ -24,6 +24,9 @@ rules:
   docs-actions:
     status: exempt
     comment: todo
+  docs-conditions:
+    status: exempt
+    comment: This integration does not provide any conditions.
   docs-high-level-description:
     status: exempt
     comment: todo
@@ -33,6 +36,9 @@ rules:
   docs-removal-instructions:
     status: exempt
     comment: todo
+  docs-triggers:
+    status: exempt
+    comment: This integration does not provide any triggers.
   entity-event-setup:
     status: exempt
     comment: todo
@@ -58,73 +64,107 @@ rules:
   # Silver Scale - Enhancements for robustness and user experience
   action-exceptions:
     status: todo
+    comment: Not yet implemented.
   config-entry-unloading:
     status: todo
+    comment: Not yet implemented.
   docs-configuration-parameters:
     status: todo
+    comment: Not yet implemented.
   docs-installation-parameters:
     status: todo
+    comment: Not yet implemented.
   entity-unavailable:
     status: todo
+    comment: Not yet implemented.
   integration-owner:
     status: todo
+    comment: Not yet implemented.
   log-when-unavailable:
     status: todo
+    comment: Not yet implemented.
   parallel-updates:
     status: todo
+    comment: Not yet implemented.
   reauthentication-flow:
     status: todo
+    comment: Not yet implemented.
   test-coverage:
     status: todo
+    comment: Not yet implemented.
 
   # Gold Scale - Advanced features and comprehensive documentation
   devices:
     status: todo
+    comment: Not yet implemented.
   diagnostics:
     status: todo
+    comment: Not yet implemented.
   discovery-update-info:
     status: todo
+    comment: Not yet implemented.
   discovery:
     status: todo
+    comment: Not yet implemented.
   docs-data-update:
     status: todo
+    comment: Not yet implemented.
   docs-examples:
     status: todo
+    comment: Not yet implemented.
   docs-known-limitations:
     status: todo
+    comment: Not yet implemented.
   docs-supported-devices:
     status: todo
+    comment: Not yet implemented.
   docs-supported-functions:
     status: todo
+    comment: Not yet implemented.
   docs-troubleshooting:
     status: todo
+    comment: Not yet implemented.
   docs-use-cases:
     status: todo
+    comment: Not yet implemented.
   dynamic-devices:
     status: todo
+    comment: Not yet implemented.
   entity-category:
     status: todo
+    comment: Not yet implemented.
   entity-device-class:
     status: todo
+    comment: Not yet implemented.
   entity-disabled-by-default:
     status: todo
+    comment: Not yet implemented.
   entity-translations:
     status: todo
+    comment: Not yet implemented.
   exception-translations:
     status: todo
+    comment: Not yet implemented.
   icon-translations:
     status: todo
+    comment: Not yet implemented.
   reconfiguration-flow:
     status: todo
+    comment: Not yet implemented.
   repair-issues:
     status: todo
+    comment: Not yet implemented.
   stale-devices:
     status: todo
+    comment: Not yet implemented.
 
   # Platinum Scale - Highest level of technical excellence and integration
   async-dependency:
     status: todo
+    comment: Not yet implemented.
   inject-websession:
     status: todo
+    comment: Not yet implemented.
   strict-typing:
     status: todo
+    comment: Not yet implemented.

@@ -1,11 +1,9 @@
 """Config flow for Comelit integration."""
 
-from __future__ import annotations
-
 from asyncio.exceptions import TimeoutError
 from collections.abc import Mapping
 import re
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 from aiocomelit import (
     ComeliteSerialBridgeApi,
@@ -95,6 +93,7 @@ class ComelitConfigFlow(ConfigFlow, domain=DOMAIN):
     VERSION = 1
     MINOR_VERSION = 2
 
+    @override
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:

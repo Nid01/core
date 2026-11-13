@@ -56,7 +56,9 @@ async def test_sph_sensor_unavailable_on_coordinator_error(
     assert state.state != STATE_UNAVAILABLE
 
     mock_growatt_v1_api.sph_detail.side_effect = growattServer.GrowattV1ApiError(
-        "Connection timeout"
+        message="Rate limited",
+        error_code=growattServer.GrowattV1ApiErrorCode.RATE_LIMITED,
+        error_msg="Too many requests",
     )
 
     freezer.tick(timedelta(minutes=5))
@@ -167,7 +169,7 @@ async def test_sensor_coordinator_updates(
     mock_growatt_v1_api.plant_energy_overview.return_value = {
         "today_energy": 25.0,  # Changed from 12.5
         "total_energy": 1250.0,
-        "current_power": 2500,
+        "current_power": 2.5,
     }
 
     # Trigger coordinator refresh
@@ -198,7 +200,9 @@ async def test_sensor_unavailable_on_coordinator_error(
 
     # Cause coordinator update to fail
     mock_growatt_v1_api.min_detail.side_effect = growattServer.GrowattV1ApiError(
-        "Connection timeout"
+        message="Rate limited",
+        error_code=growattServer.GrowattV1ApiErrorCode.RATE_LIMITED,
+        error_msg="Too many requests",
     )
 
     # Trigger coordinator refresh
@@ -280,7 +284,7 @@ async def test_midnight_bounce_suppression(
     mock_growatt_v1_api.plant_energy_overview.return_value = {
         "today_energy": 0.1,
         "total_energy": 1250.1,
-        "current_power": 500,
+        "current_power": 0.5,
     }
     freezer.tick(timedelta(minutes=5))
     async_fire_time_changed(hass)
@@ -335,7 +339,7 @@ async def test_normal_reset_no_bounce(
     mock_growatt_v1_api.plant_energy_overview.return_value = {
         "today_energy": 0.1,
         "total_energy": 1250.1,
-        "current_power": 500,
+        "current_power": 0.5,
     }
     freezer.tick(timedelta(minutes=5))
     async_fire_time_changed(hass)
@@ -349,7 +353,7 @@ async def test_normal_reset_no_bounce(
     mock_growatt_v1_api.plant_energy_overview.return_value = {
         "today_energy": 1.5,
         "total_energy": 1251.5,
-        "current_power": 2000,
+        "current_power": 2.0,
     }
     freezer.tick(timedelta(minutes=5))
     async_fire_time_changed(hass)
@@ -448,7 +452,7 @@ async def test_midnight_bounce_repeated(
     mock_growatt_v1_api.plant_energy_overview.return_value = {
         "today_energy": 0.2,
         "total_energy": 1250.2,
-        "current_power": 1000,
+        "current_power": 1.0,
     }
     freezer.tick(timedelta(minutes=5))
     async_fire_time_changed(hass)
@@ -482,7 +486,7 @@ async def test_non_total_increasing_sensor_unaffected_by_bounce_suppression(
     mock_growatt_v1_api.plant_energy_overview.return_value = {
         "today_energy": 12.5,
         "total_energy": 0,
-        "current_power": 2500,
+        "current_power": 2.5,
     }
     freezer.tick(timedelta(minutes=5))
     async_fire_time_changed(hass)
@@ -496,7 +500,7 @@ async def test_non_total_increasing_sensor_unaffected_by_bounce_suppression(
     mock_growatt_v1_api.plant_energy_overview.return_value = {
         "today_energy": 12.5,
         "total_energy": 1250.0,
-        "current_power": 2500,
+        "current_power": 2.5,
     }
     freezer.tick(timedelta(minutes=5))
     async_fire_time_changed(hass)

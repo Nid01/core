@@ -1,11 +1,9 @@
 """Diagnostics support for Duco."""
 
-from __future__ import annotations
-
 from dataclasses import asdict
 from typing import Any
 
-from duco_connectivity.exceptions import DucoConnectionError
+from duco_connectivity.exceptions import DucoConnectionError, DucoError
 
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.const import CONF_HOST
@@ -21,11 +19,19 @@ from .coordinator import DucoConfigEntry
 TO_REDACT = {
     CONF_HOST,
     "mac",
+    "Mac",
     "host_name",
+    "HostName",
     "serial_board_box",
+    "SerialBoardBox",
     "serial_board_comm",
+    "SerialBoardComm",
     "serial_duco_box",
+    "SerialDucoBox",
     "serial_duco_comm",
+    "SerialDucoComm",
+    "WifiApKey",
+    "WifiApSsid",
 }
 
 
@@ -36,7 +42,8 @@ async def async_get_config_entry_diagnostics(
     coordinator = entry.runtime_data
 
     board = asdict(coordinator.board_info)
-    # `time` is a Unix epoch timestamp of the last board info fetch; not useful for support triage.
+    # `time` is a Unix epoch timestamp of the last board
+    # info fetch; not useful for support triage.
     board.pop("time")
     if board["public_api_version"] is None:
         board.pop("public_api_version")
@@ -52,6 +59,11 @@ async def async_get_config_entry_diagnostics(
         raise HomeAssistantError(
             translation_domain=DOMAIN,
             translation_key="connection_error",
+        ) from err
+    except DucoError as err:
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="api_error",
         ) from err
 
     api_info: dict[str, Any] = {"public_api_version": api_info_obj.public_api_version}
