@@ -242,7 +242,7 @@ class KodiEntity(MediaPlayerEntity):
         if self._no_active_players:
             return MediaPlayerState.IDLE
 
-        if self._properties["speed"] == 0:
+        if self._properties.get("speed") == 0:
             return MediaPlayerState.PAUSED
 
         return MediaPlayerState.PLAYING
@@ -281,10 +281,11 @@ class KodiEntity(MediaPlayerEntity):
 
         version = (await self._kodi.get_application_properties(["version"]))["version"]
         sw_version = f"{version['major']}.{version['minor']}"
-        dev_reg = dr.async_get(self.hass)
-        device = dev_reg.async_get_device(identifiers={(DOMAIN, self.unique_id)})
-        dev_reg.async_update_device(device.id, sw_version=sw_version)
-        self._device_id = device.id
+        if self.device_entry:
+            dr.async_get(self.hass).async_update_device(
+                self.device_entry.id, sw_version=sw_version
+            )
+            self._device_id = self.device_entry.id
 
         self.async_schedule_update_ha_state(True)
 
@@ -479,25 +480,33 @@ class KodiEntity(MediaPlayerEntity):
     @override
     def media_series_title(self):
         """Title of series of current playing media, TV show only."""
-        return self._item.get("showtitle")
+        # Kodi reports an empty string when the item has none
+        return self._item.get("showtitle") or None
 
     @property
     @override
     def media_season(self):
         """Season of current playing media, TV show only."""
-        return self._item.get("season")
+        # Kodi reports a negative number (-1) when the item has none
+        if (season := self._item.get("season", -1)) < 0:
+            return None
+        return season
 
     @property
     @override
     def media_episode(self):
         """Episode of current playing media, TV show only."""
-        return self._item.get("episode")
+        # Kodi reports a negative number (-1) when the item has none
+        if (episode := self._item.get("episode", -1)) < 0:
+            return None
+        return episode
 
     @property
     @override
     def media_album_name(self):
         """Album name of current playing media, music track only."""
-        return self._item.get("album")
+        # Kodi reports an empty string when the item has none
+        return self._item.get("album") or None
 
     @property
     @override

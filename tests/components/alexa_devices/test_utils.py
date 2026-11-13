@@ -9,19 +9,17 @@ from aioamazondevices.exceptions import (
     CannotRetrieveData,
 )
 import pytest
+from pytest_homeassistant.common import MockConfigEntry
 
 from homeassistant.components.alexa_devices.const import DOMAIN
-from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
-from homeassistant.components.switch import DOMAIN as SWITCH_DOMAIN, SERVICE_TURN_ON
-from homeassistant.const import ATTR_ENTITY_ID, STATE_OFF
+from homeassistant.components.switch import DOMAIN as SWITCH_DOMAIN, SwitchService
+from homeassistant.const import STATE_OFF, CommonServiceArgument, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 from . import setup_integration
 from .const import TEST_DEVICE_1_SN
-
-from tests.common import MockConfigEntry
 
 ENTITY_ID = "switch.echo_test_do_not_disturb"
 
@@ -76,8 +74,8 @@ async def test_alexa_api_call_exceptions(
     with pytest.raises(HomeAssistantError) as exc_info:
         await hass.services.async_call(
             SWITCH_DOMAIN,
-            SERVICE_TURN_ON,
-            {ATTR_ENTITY_ID: ENTITY_ID},
+            SwitchService.TURN_ON,
+            {CommonServiceArgument.ENTITY_ID: ENTITY_ID},
             blocking=True,
         )
 
@@ -107,7 +105,7 @@ async def test_alexa_unique_id_migration(
     )
 
     entity = entity_registry.async_get_or_create(
-        SWITCH_DOMAIN,
+        Platform.SWITCH,
         DOMAIN,
         unique_id=f"{TEST_DEVICE_1_SN}-do_not_disturb",
         device_id=device.id,
@@ -145,7 +143,7 @@ async def test_alexa_dnd_group_removal(
     )
 
     entity = entity_registry.async_get_or_create(
-        SWITCH_DOMAIN,
+        Platform.SWITCH,
         DOMAIN,
         unique_id=f"{TEST_DEVICE_1_SN}-do_not_disturb",
         device_id=device.id,
@@ -184,7 +182,7 @@ async def test_alexa_unsupported_notification_sensor_removal(
     )
 
     entity = entity_registry.async_get_or_create(
-        SENSOR_DOMAIN,
+        Platform.SENSOR,
         DOMAIN,
         unique_id=f"{TEST_DEVICE_1_SN}-Timer",
         device_id=device.id,
