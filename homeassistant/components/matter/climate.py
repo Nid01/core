@@ -26,13 +26,12 @@ from homeassistant.components.climate import (
     HVACAction,
     HVACMode,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_TEMPERATURE, Platform, UnitOfTemperature
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .entity import MatterEntity, MatterEntityDescription
-from .helpers import get_matter
+from .helpers import MatterConfigEntry
 from .models import MatterDiscoverySchema
 
 HUMIDITY_SCALING_FACTOR = 100
@@ -194,11 +193,11 @@ class ThermostatRunningState(IntEnum):
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: MatterConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up Matter climate platform from Config Entry."""
-    matter = get_matter(hass)
+    matter = config_entry.runtime_data.adapter
     matter.register_platform_handler(Platform.CLIMATE, async_add_entities)
 
 
@@ -251,7 +250,7 @@ class MatterClimate(MatterEntity, ClimateEntity):
                         clusters.Thermostat.Attributes.OccupiedHeatingSetpoint
                     )
                 await self.write_attribute(
-                    value=int(target_temperature * TEMPERATURE_SCALING_FACTOR),
+                    value=round(target_temperature * TEMPERATURE_SCALING_FACTOR),
                     matter_attribute=matter_attribute,
                 )
             return
@@ -260,7 +259,7 @@ class MatterClimate(MatterEntity, ClimateEntity):
             # multi setpoint control - low setpoint (heat)
             if self.target_temperature_low != target_temperature_low:
                 await self.write_attribute(
-                    value=int(target_temperature_low * TEMPERATURE_SCALING_FACTOR),
+                    value=round(target_temperature_low * TEMPERATURE_SCALING_FACTOR),
                     matter_attribute=clusters.Thermostat.Attributes.OccupiedHeatingSetpoint,
                 )
 
@@ -268,7 +267,7 @@ class MatterClimate(MatterEntity, ClimateEntity):
             # multi setpoint control - high setpoint (cool)
             if self.target_temperature_high != target_temperature_high:
                 await self.write_attribute(
-                    value=int(target_temperature_high * TEMPERATURE_SCALING_FACTOR),
+                    value=round(target_temperature_high * TEMPERATURE_SCALING_FACTOR),
                     matter_attribute=clusters.Thermostat.Attributes.OccupiedCoolingSetpoint,
                 )
 

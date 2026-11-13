@@ -21,7 +21,6 @@ from homeassistant.components.number import (
     NumberEntity,
     NumberEntityDescription,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfTime
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -29,13 +28,12 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from .const import (
     ACTUATOR,
     CORE_CLIMATE_TIMER,
-    DOMAIN,
     ENTITY_TYPES,
     FIRMNESS,
     FOOT_WARMING_TIMER,
     ICON_OCCUPIED,
 )
-from .coordinator import SleepIQData, SleepIQDataUpdateCoordinator
+from .coordinator import SleepIQConfigEntry, SleepIQDataUpdateCoordinator
 from .entity import SleepIQBedEntity, sleeper_for_side
 
 
@@ -160,6 +158,8 @@ NUMBER_DESCRIPTIONS: dict[str, SleepIQNumberEntityDescription] = {
         set_value_fn=_async_set_foot_warmer_time,
         get_name_fn=_get_foot_warming_name,
         get_unique_id_fn=_get_foot_warming_unique_id,
+        native_unit_of_measurement=UnitOfTime.MINUTES,
+        device_class=NumberDeviceClass.DURATION,
     ),
     CORE_CLIMATE_TIMER: SleepIQNumberEntityDescription(
         key=CORE_CLIMATE_TIMER,
@@ -172,7 +172,7 @@ NUMBER_DESCRIPTIONS: dict[str, SleepIQNumberEntityDescription] = {
         set_value_fn=_async_set_core_climate_time,
         get_name_fn=_get_core_climate_name,
         get_unique_id_fn=_get_core_climate_unique_id,
-        native_unit_of_measurement=UnitOfTime.SECONDS,
+        native_unit_of_measurement=UnitOfTime.MINUTES,
         device_class=NumberDeviceClass.DURATION,
     ),
 }
@@ -180,11 +180,11 @@ NUMBER_DESCRIPTIONS: dict[str, SleepIQNumberEntityDescription] = {
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: SleepIQConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up the SleepIQ bed sensors."""
-    data: SleepIQData = hass.data[DOMAIN][entry.entry_id]
+    data = entry.runtime_data
 
     entities: list[SleepIQNumberEntity] = []
     for bed in data.client.beds.values():

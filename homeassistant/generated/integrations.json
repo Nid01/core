@@ -1323,6 +1323,12 @@
           "iot_class": "local_push",
           "name": "Denon AVR Network Receivers"
         },
+        "denon_rs232": {
+          "integration_type": "hub",
+          "config_flow": true,
+          "iot_class": "local_push",
+          "name": "Denon RS232"
+        },
         "heos": {
           "integration_type": "hub",
           "config_flow": true,
@@ -1521,6 +1527,12 @@
       "config_flow": true,
       "iot_class": "cloud_polling"
     },
+    "duco": {
+      "name": "Duco",
+      "integration_type": "hub",
+      "config_flow": true,
+      "iot_class": "local_polling"
+    },
     "dunehd": {
       "name": "Dune HD",
       "integration_type": "device",
@@ -1550,6 +1562,12 @@
       "integration_type": "service",
       "config_flow": true,
       "iot_class": "cloud_polling"
+    },
+    "earn_e_p1": {
+      "name": "EARN-E P1 Meter",
+      "integration_type": "device",
+      "config_flow": true,
+      "iot_class": "local_push"
     },
     "eastron": {
       "name": "Eastron",
@@ -1924,6 +1942,12 @@
           "name": "EufyLife"
         }
       }
+    },
+    "eurotronic_cometblue": {
+      "name": "Eurotronic Comet Blue",
+      "integration_type": "device",
+      "config_flow": true,
+      "iot_class": "local_polling"
     },
     "eve": {
       "name": "Eve",
@@ -2313,6 +2337,12 @@
       "integration_type": "device",
       "config_flow": true,
       "iot_class": "local_polling"
+    },
+    "fumis": {
+      "name": "Fumis",
+      "integration_type": "device",
+      "config_flow": true,
+      "iot_class": "cloud_polling"
     },
     "futurenow": {
       "name": "P5 FutureNow",
@@ -2951,6 +2981,12 @@
           "config_flow": true,
           "iot_class": "cloud_polling",
           "name": "Honeywell Total Connect Comfort (US)"
+        },
+        "honeywell_string_lights": {
+          "integration_type": "device",
+          "config_flow": true,
+          "iot_class": "assumed_state",
+          "name": "Honeywell String Lights"
         }
       }
     },
@@ -2974,7 +3010,7 @@
     },
     "html5": {
       "name": "HTML5 Push Notifications",
-      "integration_type": "hub",
+      "integration_type": "service",
       "config_flow": true,
       "iot_class": "cloud_push",
       "single_config_entry": true
@@ -3062,7 +3098,7 @@
       "iot_class": "local_polling"
     },
     "iaqualink": {
-      "name": "Jandy iAqualink",
+      "name": "Jandy iAquaLink",
       "integration_type": "hub",
       "config_flow": true,
       "iot_class": "cloud_polling",
@@ -3460,6 +3496,12 @@
       "integration_type": "device",
       "config_flow": true,
       "iot_class": "assumed_state"
+    },
+    "kiosker": {
+      "name": "Kiosker",
+      "integration_type": "device",
+      "config_flow": true,
+      "iot_class": "local_polling"
     },
     "kira": {
       "name": "Kira",
@@ -4729,6 +4771,12 @@
       "config_flow": true,
       "iot_class": "cloud_polling"
     },
+    "novy_cooker_hood": {
+      "name": "Novy Cooker Hood",
+      "integration_type": "device",
+      "config_flow": true,
+      "iot_class": "assumed_state"
+    },
     "nrgkick": {
       "name": "NRGkick",
       "integration_type": "device",
@@ -4867,6 +4915,13 @@
       "integration_type": "hub",
       "config_flow": false,
       "iot_class": "local_polling"
+    },
+    "omie": {
+      "name": "OMIE - Spain and Portugal electricity prices",
+      "integration_type": "service",
+      "config_flow": true,
+      "iot_class": "cloud_polling",
+      "single_config_entry": true
     },
     "omnilogic": {
       "name": "Hayward Omnilogic",
@@ -5075,12 +5130,6 @@
     "otbr": {
       "name": "Open Thread Border Router",
       "integration_type": "service",
-      "config_flow": true,
-      "iot_class": "local_polling"
-    },
-    "otp": {
-      "name": "One-Time Password (OTP)",
-      "integration_type": "hub",
       "config_flow": true,
       "iot_class": "local_polling"
     },
@@ -6091,6 +6140,12 @@
       "config_flow": true,
       "iot_class": "cloud_polling"
     },
+    "sensereo": {
+      "name": "Sensereo",
+      "iot_standards": [
+        "matter"
+      ]
+    },
     "sensibo": {
       "name": "Sensibo",
       "integration_type": "hub",
@@ -6943,6 +6998,12 @@
         }
       }
     },
+    "teleinfo": {
+      "name": "Teleinfo",
+      "integration_type": "device",
+      "config_flow": true,
+      "iot_class": "local_polling"
+    },
     "telldus": {
       "name": "Telldus",
       "integrations": {
@@ -7605,6 +7666,12 @@
     "victron": {
       "name": "Victron",
       "integrations": {
+        "victron_gx": {
+          "integration_type": "hub",
+          "config_flow": true,
+          "iot_class": "local_push",
+          "name": "Victron GX"
+        },
         "victron_ble": {
           "integration_type": "device",
           "config_flow": true,
@@ -8175,6 +8242,12 @@
         "zwave"
       ]
     },
+    "zunzunbee": {
+      "name": "Zunzunbee",
+      "iot_standards": [
+        "zigbee"
+      ]
+    },
     "zwave_js": {
       "name": "Z-Wave",
       "integration_type": "hub",
@@ -8267,6 +8340,12 @@
       "integration_type": "helper",
       "config_flow": true,
       "iot_class": "calculated"
+    },
+    "otp": {
+      "name": "One-Time Password (OTP)",
+      "integration_type": "helper",
+      "config_flow": true,
+      "iot_class": "local_polling"
     },
     "random": {
       "integration_type": "helper",

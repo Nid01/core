@@ -56,10 +56,12 @@ from .common import (
     MOCK_NUMBER_SUBENTRY_DATA_CUSTOM_UNIT,
     MOCK_NUMBER_SUBENTRY_DATA_DEVICE_CLASS_UNIT,
     MOCK_NUMBER_SUBENTRY_DATA_NO_UNIT,
+    MOCK_NUMBER_SUBENTRY_DATA_NONE_UNIT,
     MOCK_SELECT_SUBENTRY_DATA,
     MOCK_SENSOR_SUBENTRY_DATA,
     MOCK_SENSOR_SUBENTRY_DATA_LAST_RESET_TEMPLATE,
     MOCK_SENSOR_SUBENTRY_DATA_STATE_CLASS,
+    MOCK_SENSOR_SUBENTRY_DATA_UOM_NONE,
     MOCK_SIREN_SUBENTRY_DATA,
     MOCK_SWITCH_SUBENTRY_DATA,
     MOCK_TEXT_SUBENTRY_DATA,
@@ -3558,6 +3560,30 @@ async def test_migrate_of_incompatible_config_entry(
             id="number_no_unit",
         ),
         pytest.param(
+            MOCK_NUMBER_SUBENTRY_DATA_NONE_UNIT,
+            {"name": "Milk notifier", "mqtt_settings": {"qos": 0}},
+            {"name": "Purifier"},
+            {
+                "device_class": "aqi",
+                "unit_of_measurement": "None",
+            },
+            (),
+            {
+                "command_topic": "test-topic",
+                "command_template": "{{ value }}",
+                "state_topic": "test-topic",
+                "min": 0,
+                "max": 10,
+                "step": 2,
+                "mode": "auto",
+                "value_template": "{{ value_json.value }}",
+                "retain": False,
+            },
+            (),
+            "Milk notifier Purifier",
+            id="number_None_unit",
+        ),
+        pytest.param(
             MOCK_SELECT_SUBENTRY_DATA,
             {"name": "Milk notifier", "mqtt_settings": {"qos": 0}},
             {"name": "Mode"},
@@ -3631,6 +3657,23 @@ async def test_migrate_of_incompatible_config_entry(
             ),
             "Milk notifier Energy",
             id="sensor_options",
+        ),
+        pytest.param(
+            MOCK_SENSOR_SUBENTRY_DATA_UOM_NONE,
+            {"name": "Milk notifier", "mqtt_settings": {"qos": 0}},
+            {"name": "Air quality"},
+            {
+                "state_class": "measurement",
+                "device_class": "aqi",
+                "unit_of_measurement": "None",
+            },
+            (),
+            {
+                "state_topic": "test-topic",
+            },
+            (),
+            "Milk notifier Air quality",
+            id="sensor_aqi",
         ),
         pytest.param(
             MOCK_SENSOR_SUBENTRY_DATA_STATE_CLASS,
@@ -5081,6 +5124,43 @@ async def test_subentry_reconfigure_update_device_properties(
     )
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "device"
+
+    # Check suggested values
+    base_schema_key_descriptions = {
+        key: key.description for key, value in result["data_schema"].schema.items()
+    }
+    assert base_schema_key_descriptions == {
+        "name": {"suggested_value": "Milk notifier"},
+        "model": {"suggested_value": "Model XL"},
+        "model_id": {"suggested_value": "mn002"},
+        "manufacturer": {"suggested_value": "Milk Masters"},
+        "configuration_url": {"suggested_value": "https://example.com"},
+        "advanced_settings": None,
+        "mqtt_settings": None,
+    }
+
+    advanced_settings_key_descriptions = {
+        key: key.description
+        for key, value in result["data_schema"]
+        .schema["advanced_settings"]
+        .schema.schema.items()
+    }
+    assert advanced_settings_key_descriptions == {
+        "sw_version": {"suggested_value": "1.0"},
+        "hw_version": {"suggested_value": "2.1 rev a"},
+    }
+    assert result["data_schema"].schema["advanced_settings"].options == {
+        "collapsed": False
+    }
+
+    mqtt_settings_key_descriptions = {
+        key: key.description
+        for key, value in result["data_schema"]
+        .schema["mqtt_settings"]
+        .schema.schema.items()
+    }
+    assert mqtt_settings_key_descriptions == {"qos": {"suggested_value": 2}}
+    assert result["data_schema"].schema["mqtt_settings"].options == {"collapsed": False}
 
     # Update the device details
     result = await hass.config_entries.subentries.async_configure(

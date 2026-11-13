@@ -17,9 +17,13 @@ from syrupy.assertion import SnapshotAssertion
 
 from homeassistant.components import conversation
 from homeassistant.components.homeassistant.exposed_entities import async_expose_entity
+from homeassistant.components.intent import async_register_timer_handler
 from homeassistant.components.openai_conversation.const import (
+    CONF_CHAT_MODEL,
     CONF_CODE_INTERPRETER,
+    CONF_REASONING_SUMMARY,
     CONF_SERVICE_TIER,
+    CONF_STORE_RESPONSES,
     CONF_WEB_SEARCH,
     CONF_WEB_SEARCH_CITY,
     CONF_WEB_SEARCH_CONTEXT_SIZE,
@@ -383,6 +387,46 @@ async def test_function_call_without_reasoning(
     assert mock_chat_log.content[1:] == snapshot
 
 
+@freeze_time("2025-10-31 18:00:00")
+async def test_reasoning_summary_off_omits_summary_key(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_init_component: None,
+    mock_create_stream: AsyncMock,
+    mock_chat_log: MockChatLog,  # noqa: F811
+) -> None:
+    """Test that reasoning summary 'off' omits the summary key from the API call."""
+    conversation_subentry = next(
+        subentry
+        for subentry in mock_config_entry.subentries.values()
+        if subentry.subentry_type == "conversation"
+    )
+    hass.config_entries.async_update_subentry(
+        mock_config_entry,
+        conversation_subentry,
+        data={
+            CONF_CHAT_MODEL: "o4-mini",
+            CONF_REASONING_SUMMARY: "off",
+        },
+    )
+    await hass.async_block_till_done()
+
+    mock_create_stream.return_value = [
+        create_message_item(id="msg_A", text="Hello", output_index=0),
+    ]
+
+    await conversation.async_converse(
+        hass,
+        "Hello",
+        mock_chat_log.conversation_id,
+        Context(),
+        agent_id="conversation.openai_conversation",
+    )
+
+    reasoning = mock_create_stream.call_args.kwargs["reasoning"]
+    assert "summary" not in reasoning
+
+
 @pytest.mark.parametrize(
     ("description", "messages"),
     [
@@ -460,16 +504,72 @@ async def test_assist_api_tools_conversion(
         hass.states.async_set(f"{component}.test", "on")
         async_expose_entity(hass, "conversation", f"{component}.test", True)
 
+    async_register_timer_handler(hass, "test_device", lambda *args: None)
+
     mock_create_stream.return_value = [
         create_message_item(id="msg_A", text="Cool", output_index=0)
     ]
 
     await conversation.async_converse(
-        hass, "hello", None, Context(), agent_id="conversation.openai_conversation"
+        hass,
+        "hello",
+        None,
+        Context(),
+        agent_id="conversation.openai_conversation",
+        device_id="test_device",
     )
 
     tools = mock_create_stream.mock_calls[0][2]["tools"]
     assert tools
+
+    for tool in tools:
+        msg = (
+            f"Invalid schema for function '{tool['name']}': schema must have type "
+            "'object' and not have 'oneOf'/'anyOf'/'allOf'/'enum'/'not' at the top level."
+        )
+        assert tool["parameters"]["type"] == "object", msg
+        for key in ("oneOf", "anyOf", "allOf", "enum", "not"):
+            assert key not in tool["parameters"], msg
+
+
+@pytest.mark.parametrize(
+    "expected_store",
+    [
+        False,
+        True,
+    ],
+)
+async def test_store_responses_forwarded_for_conversation_agent(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_init_component,
+    mock_create_stream: AsyncMock,
+    expected_store: bool,
+) -> None:
+    """Test store_responses is forwarded for the conversation agent."""
+    subentry = next(
+        entry
+        for entry in mock_config_entry.subentries.values()
+        if entry.subentry_type == "conversation"
+    )
+    hass.config_entries.async_update_subentry(
+        mock_config_entry,
+        subentry,
+        data={**subentry.data, CONF_STORE_RESPONSES: expected_store},
+    )
+    await hass.config_entries.async_reload(mock_config_entry.entry_id)
+
+    mock_create_stream.return_value = [
+        create_message_item(id="msg_A", text="Hello!", output_index=0)
+    ]
+
+    result = await conversation.async_converse(
+        hass, "hello", None, Context(), agent_id=mock_config_entry.entry_id
+    )
+
+    assert result.response.response_type == intent.IntentResponseType.ACTION_DONE
+    assert mock_create_stream.call_args is not None
+    assert mock_create_stream.call_args.kwargs["store"] is expected_store
 
 
 @pytest.mark.parametrize("inline_citations", [True, False])
@@ -557,6 +657,52 @@ async def test_web_search(
         in mock_create_stream.mock_calls[0][2]["input"][0]["content"][1]["text"]
     ) is not inline_citations
     assert mock_create_stream.mock_calls[1][2]["input"][1:] == snapshot
+
+
+async def test_web_search_remove_citations_gpt5(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_init_component,
+    mock_create_stream,
+    mock_chat_log: MockChatLog,  # noqa: F811
+) -> None:
+    """Test that citations are stripped for GPT-5 models with inline_citations disabled."""
+    subentry = next(iter(mock_config_entry.subentries.values()))
+    hass.config_entries.async_update_subentry(
+        mock_config_entry,
+        subentry,
+        data={
+            **subentry.data,
+            CONF_CHAT_MODEL: "gpt-5-mini",
+            CONF_WEB_SEARCH: True,
+            CONF_WEB_SEARCH_INLINE_CITATIONS: False,
+        },
+    )
+    await hass.config_entries.async_reload(mock_config_entry.entry_id)
+
+    message = [
+        "The match ended 0-2",
+        " ([legaseriea.it](https://www.legaseriea.it/))",
+        ".",
+    ]
+    mock_create_stream.return_value = [
+        (
+            *create_web_search_item(id="ws_A", output_index=0),
+            *create_message_item(id="msg_A", text=message, output_index=1),
+        )
+    ]
+
+    result = await conversation.async_converse(
+        hass,
+        "What was the score?",
+        mock_chat_log.conversation_id,
+        Context(),
+        agent_id="conversation.openai_conversation",
+    )
+
+    assert result.response.response_type == intent.IntentResponseType.ACTION_DONE
+    # Citation should be stripped from the response
+    assert result.response.speech["plain"]["speech"] == "The match ended 0-2."
 
 
 async def test_code_interpreter(

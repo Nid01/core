@@ -521,11 +521,16 @@ async def test_untrack_time_change(hass: HomeAssistant) -> None:
 @pytest.mark.parametrize(
     ("at_sensor"), ["sensor.next_alarm", "{{ 'sensor.next_alarm' }}"]
 )
+@pytest.mark.parametrize(
+    "device_class",
+    [SensorDeviceClass.TIMESTAMP, SensorDeviceClass.UPTIME],
+)
 async def test_if_fires_using_at_sensor(
     hass: HomeAssistant,
     freezer: FrozenDateTimeFactory,
     service_calls: list[ServiceCall],
     at_sensor: str,
+    device_class: SensorDeviceClass,
 ) -> None:
     """Test for firing at sensor time."""
     now = dt_util.now()
@@ -535,7 +540,7 @@ async def test_if_fires_using_at_sensor(
     hass.states.async_set(
         "sensor.next_alarm",
         trigger_dt.isoformat(),
-        {ATTR_DEVICE_CLASS: SensorDeviceClass.TIMESTAMP},
+        {ATTR_DEVICE_CLASS: device_class},
     )
 
     time_that_will_not_match_right_away = trigger_dt - timedelta(minutes=1)
@@ -572,7 +577,7 @@ async def test_if_fires_using_at_sensor(
     hass.states.async_set(
         "sensor.next_alarm",
         trigger_dt.isoformat(),
-        {ATTR_DEVICE_CLASS: SensorDeviceClass.TIMESTAMP},
+        {ATTR_DEVICE_CLASS: device_class},
     )
     await hass.async_block_till_done()
 
@@ -589,13 +594,13 @@ async def test_if_fires_using_at_sensor(
         hass.states.async_set(
             "sensor.next_alarm",
             trigger_dt.isoformat(),
-            {ATTR_DEVICE_CLASS: SensorDeviceClass.TIMESTAMP},
+            {ATTR_DEVICE_CLASS: device_class},
         )
         await hass.async_block_till_done()
         hass.states.async_set(
             "sensor.next_alarm",
             broken,
-            {ATTR_DEVICE_CLASS: SensorDeviceClass.TIMESTAMP},
+            {ATTR_DEVICE_CLASS: device_class},
         )
         await hass.async_block_till_done()
 
@@ -609,7 +614,7 @@ async def test_if_fires_using_at_sensor(
     hass.states.async_set(
         "sensor.next_alarm",
         trigger_dt.isoformat(),
-        {ATTR_DEVICE_CLASS: SensorDeviceClass.TIMESTAMP},
+        {ATTR_DEVICE_CLASS: device_class},
     )
     await hass.async_block_till_done()
     hass.states.async_set(
@@ -633,12 +638,17 @@ async def test_if_fires_using_at_sensor(
         ({"minutes": 5}, timedelta(minutes=5)),
     ],
 )
+@pytest.mark.parametrize(
+    "device_class",
+    [SensorDeviceClass.TIMESTAMP, SensorDeviceClass.UPTIME],
+)
 async def test_if_fires_using_at_sensor_with_offset(
     hass: HomeAssistant,
     service_calls: list[ServiceCall],
     freezer: FrozenDateTimeFactory,
     offset: str | dict[str, int],
     delta: timedelta,
+    device_class: SensorDeviceClass,
 ) -> None:
     """Test for firing at sensor time."""
     now = dt_util.now()
@@ -649,7 +659,7 @@ async def test_if_fires_using_at_sensor_with_offset(
     hass.states.async_set(
         "sensor.next_alarm",
         start_dt.isoformat(),
-        {ATTR_DEVICE_CLASS: SensorDeviceClass.TIMESTAMP},
+        {ATTR_DEVICE_CLASS: device_class},
     )
 
     time_that_will_not_match_right_away = trigger_dt - timedelta(minutes=1)
@@ -693,7 +703,7 @@ async def test_if_fires_using_at_sensor_with_offset(
     hass.states.async_set(
         "sensor.next_alarm",
         start_dt.isoformat(),
-        {ATTR_DEVICE_CLASS: SensorDeviceClass.TIMESTAMP},
+        {ATTR_DEVICE_CLASS: device_class},
     )
     await hass.async_block_till_done()
 
@@ -705,6 +715,52 @@ async def test_if_fires_using_at_sensor_with_offset(
         service_calls[1].data["some"]
         == f"time-{trigger_dt.day}-{trigger_dt.hour}-{trigger_dt.minute}-{trigger_dt.second}-sensor.next_alarm"
     )
+
+
+async def test_if_fires_using_at_sensor_dict_without_offset(
+    hass: HomeAssistant,
+    freezer: FrozenDateTimeFactory,
+    service_calls: list[ServiceCall],
+) -> None:
+    """Test for firing at sensor time using dict format without offset."""
+    now = dt_util.now()
+
+    trigger_dt = now.replace(hour=5, minute=0, second=0, microsecond=0) + timedelta(2)
+
+    hass.states.async_set(
+        "sensor.next_alarm",
+        trigger_dt.isoformat(),
+        {ATTR_DEVICE_CLASS: SensorDeviceClass.TIMESTAMP},
+    )
+
+    time_that_will_not_match_right_away = trigger_dt - timedelta(minutes=1)
+
+    freezer.move_to(dt_util.as_utc(time_that_will_not_match_right_away))
+    assert await async_setup_component(
+        hass,
+        automation.DOMAIN,
+        {
+            automation.DOMAIN: {
+                "trigger": {
+                    "platform": "time",
+                    "at": {
+                        "entity_id": "sensor.next_alarm",
+                    },
+                },
+                "action": {
+                    "service": "test.automation",
+                    "data_template": {"some": "{{ trigger.entity_id }}"},
+                },
+            }
+        },
+    )
+    await hass.async_block_till_done()
+
+    async_fire_time_changed(hass, trigger_dt + timedelta(seconds=1))
+    await hass.async_block_till_done()
+
+    assert len(service_calls) == 1
+    assert service_calls[0].data["some"] == "sensor.next_alarm"
 
 
 @pytest.mark.parametrize(
